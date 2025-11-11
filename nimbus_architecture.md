@@ -1,4 +1,4 @@
-# Percepta – End-to-End Architecture Overview
+# Nimbus – End-to-End Architecture Overview
 
 ## 1. High-Level Overview
 
