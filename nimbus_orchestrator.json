@@ -1,0 +1,200 @@
+{
+  "name": "Nimbus - Orchestrator (Cron -> Source Workers)",
+  "nodes": [
+    {
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "hour": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                10,
+                11,
+                12,
+                13,
+                14,
+                15,
+                16,
+                17,
+                18,
+                19,
+                20,
+                21,
+                22,
+                23
+              ],
+              "minute": "*/15"
+            }
+          ]
+        }
+      },
+      "id": "cron1",
+      "name": "Cron (every 15 min)",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [
+        200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "keepOnlySet": true,
+        "values": {
+          "string": [
+            {
+              "name": "run_id",
+              "value": "{{$now}}"
+            },
+            {
+              "name": "env",
+              "value": "prod"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set1",
+      "name": "Set \u2192 Context",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [
+        420,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": "WORKFLOW_ID_REDDIT"
+      },
+      "id": "execReddit",
+      "name": "Execute Workflow \u2192 Reddit Worker",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [
+        680,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": "WORKFLOW_ID_FACEBOOK"
+      },
+      "id": "execFacebook",
+      "name": "Execute Workflow \u2192 Facebook Worker",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": "WORKFLOW_ID_YELP"
+      },
+      "id": "execYelp",
+      "name": "Execute Workflow \u2192 Yelp Worker",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [
+        680,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "passThrough"
+      },
+      "id": "merge1",
+      "name": "Merge (summary)",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        900,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Cron (every 15 min)": {
+      "main": [
+        [
+          {
+            "node": "Set \u2192 Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set \u2192 Context": {
+      "main": [
+        [
+          {
+            "node": "Execute Workflow \u2192 Reddit Worker",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Execute Workflow \u2192 Facebook Worker",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Execute Workflow \u2192 Yelp Worker",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Workflow \u2192 Reddit Worker": {
+      "main": [
+        [
+          {
+            "node": "Merge (summary)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Workflow \u2192 Facebook Worker": {
+      "main": [
+        [
+          {
+            "node": "Merge (summary)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Workflow \u2192 Yelp Worker": {
+      "main": [
+        [
+          {
+            "node": "Merge (summary)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "staticData": {},
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

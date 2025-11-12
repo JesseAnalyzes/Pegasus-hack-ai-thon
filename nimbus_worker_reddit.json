@@ -1,0 +1,344 @@
+{
+  "name": "Nimbus - Worker (Reddit \u2192 Bronze)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "trigger1",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        200,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "query",
+        "query": "SELECT last_seen_created_utc\nFROM ingestion_offsets\nWHERE source = 'reddit'\nLIMIT 1;"
+      },
+      "id": "pgGetCursor",
+      "name": "Postgres \u2192 Get Cursor",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [
+        420,
+        200
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "CRED_POSTGRES_Nimbus",
+          "name": "postgres_Nimbus"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "url": "https://oauth.reddit.com/r/{{ $json.subreddit || $env.REDDIT_SUBREDDIT || 'frontierfios' }}/new",
+        "options": {
+          "pagination": "none",
+          "queryParametersUi": {
+            "parameter": [
+              {
+                "name": "limit",
+                "value": "100"
+              }
+            ]
+          },
+          "headerParametersUi": {
+            "parameter": []
+          }
+        }
+      },
+      "id": "httpFetch",
+      "name": "HTTP \u2192 Reddit (Page 1)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        660,
+        200
+      ],
+      "credentials": {
+        "oAuth2Api": {
+          "id": "CRED_REDDIT_OAUTH2",
+          "name": "reddit_oauth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [],
+          "string": [
+            {
+              "value1": "={{ Object.keys($json).length }}",
+              "operation": "notEqual",
+              "value2": "0"
+            }
+          ]
+        }
+      },
+      "id": "ifAny",
+      "name": "IF \u2192 Any results?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        900,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "batchSize": 50
+      },
+      "id": "split1",
+      "name": "Split In Batches",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 1,
+      "position": [
+        1140,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Normalize items from Reddit response into Nimbus Bronze schema\n// Expecting data.children array from /new endpoint\nconst input = items[0].json;\nconst children = input?.data?.children || [];\nconst out = children.map(c => {\n  const p = c.data || {};\n  return {\n    json: {\n      source: 'reddit',\n      source_id: p.id,\n      author: p.author || null,\n      title: p.title || null,\n      body: p.selftext || null,\n      url: p.permalink ? `https://reddit.com${p.permalink}` : null,\n      created_at: p.created_utc ? new Date(p.created_utc * 1000).toISOString() : new Date().toISOString(),\n      collected_at: new Date().toISOString(),\n      raw: p\n    }\n  };\n});\nreturn out;\n"
+      },
+      "id": "funcNormalize",
+      "name": "Function \u2192 Normalize \u2192 Bronze shape",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1380,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO bronze_posts\n  (source, source_id, author, title, body, url, created_at, collected_at, raw)\nVALUES\n  (:source, :source_id, :author, :title, :body, :url, :created_at, :collected_at, :raw::jsonb)\nON CONFLICT (source, source_id) DO NOTHING;\n"
+      },
+      "id": "pgUpsert",
+      "name": "Postgres \u2192 UPSERT Bronze",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [
+        1620,
+        200
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "CRED_POSTGRES_Nimbus",
+          "name": "postgres_Nimbus"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "json",
+        "jsonProperties": "source,source_id,author,title,body,url,created_at,collected_at",
+        "options": {}
+      },
+      "id": "itemListsBatch",
+      "name": "Item Lists \u2192 (optional batching for /api/analyze)",
+      "type": "n8n-nodes-base.itemLists",
+      "typeVersion": 1,
+      "position": [
+        1860,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://YOUR_NEXT_APP_URL/api/analyze",
+        "options": {},
+        "jsonParameters": true,
+        "sendBody": true,
+        "authentication": "genericCredentialType"
+      },
+      "id": "httpAnalyze",
+      "name": "HTTP \u2192 Next.js /api/analyze (optional)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        2100,
+        200
+      ],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "CRED_INTERNAL_HTTP",
+          "name": "Nimbus_internal"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// compute new cursor from this page (max created_at)\nconst times = items.map(i => Date.parse(i.json.created_at)).filter(Boolean);\nconst maxTs = times.length ? new Date(Math.max(...times)).toISOString() : new Date().toISOString();\nreturn [{ json: { last_seen_created_utc: maxTs }}];\n"
+      },
+      "id": "funcCursor",
+      "name": "Function \u2192 Compute Cursor",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        2340,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO ingestion_offsets (source, last_seen_created_utc, updated_at)\nVALUES ('reddit', :last_seen_created_utc, NOW())\nON CONFLICT (source)\nDO UPDATE SET last_seen_created_utc = EXCLUDED.last_seen_created_utc,\n              updated_at = NOW();\n"
+      },
+      "id": "pgSaveCursor",
+      "name": "Postgres \u2192 Save Cursor",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [
+        2580,
+        200
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "CRED_POSTGRES_Nimbus",
+          "name": "postgres_Nimbus"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "noResultsEnd",
+      "name": "Done (no results)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1140,
+        360
+      ]
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Postgres \u2192 Get Cursor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres \u2192 Get Cursor": {
+      "main": [
+        [
+          {
+            "node": "HTTP \u2192 Reddit (Page 1)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP \u2192 Reddit (Page 1)": {
+      "main": [
+        [
+          {
+            "node": "IF \u2192 Any results?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF \u2192 Any results?": {
+      "main": [
+        [
+          {
+            "node": "Split In Batches",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Done (no results)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split In Batches": {
+      "main": [
+        [
+          {
+            "node": "Function \u2192 Normalize \u2192 Bronze shape",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Function \u2192 Normalize \u2192 Bronze shape": {
+      "main": [
+        [
+          {
+            "node": "Postgres \u2192 UPSERT Bronze",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres \u2192 UPSERT Bronze": {
+      "main": [
+        [
+          {
+            "node": "Item Lists \u2192 (optional batching for /api/analyze)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Item Lists \u2192 (optional batching for /api/analyze)": {
+      "main": [
+        [
+          {
+            "node": "HTTP \u2192 Next.js /api/analyze (optional)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP \u2192 Next.js /api/analyze (optional)": {
+      "main": [
+        [
+          {
+            "node": "Function \u2192 Compute Cursor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Function \u2192 Compute Cursor": {
+      "main": [
+        [
+          {
+            "node": "Postgres \u2192 Save Cursor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "staticData": {},
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
