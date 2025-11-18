@@ -27,6 +27,21 @@ yarn-error.log*
 # local env files
 .env*.local
 .env
+env.example
+
+# credentials and authentication
+**/AUTHENTICATION_INFO.txt
+**/credential_setup*.txt
+**/*credentials*.txt
+**/*secrets*.txt
+
+# setup and deployment documentation
+HACKATHON_SETUP.md
+VERCEL_DEPLOYMENT_ENV.md
+*DO_THIS_NOW.md
+CHANGES_FOR_HACKATHON.md
+*SETUP_STEPS.md
+CREATE_ENV_FILE.md
 
 # vercel
 .vercel
@@ -44,3 +59,4 @@ next-env.d.ts
 
 # OS
 Thumbs.db
+config.ts

@@ -132,6 +132,16 @@ function buildFilterClause(
 }
 
 /**
+ * Helper to append additional WHERE conditions
+ */
+function appendCondition(existingWhereClause: string, condition: string): string {
+  if (!existingWhereClause) {
+    return `WHERE ${condition}`;
+  }
+  return `${existingWhereClause} AND ${condition}`;
+}
+
+/**
  * Get summary statistics with filters
  */
 export async function getSummaryStats(
@@ -203,7 +213,7 @@ export async function getSummaryStats(
   const regionQuery = `
     SELECT region, COUNT(*) as count
     FROM ${schemaPrefix}frontier_reviews_processed
-    ${whereClause} AND region IS NOT NULL
+    ${appendCondition(whereClause, 'region IS NOT NULL')}
     GROUP BY region
     ORDER BY count DESC
   `;
@@ -212,7 +222,7 @@ export async function getSummaryStats(
   const stateQuery = `
     SELECT state, COUNT(*) as count
     FROM ${schemaPrefix}frontier_reviews_processed
-    ${whereClause} AND state IS NOT NULL
+    ${appendCondition(whereClause, 'state IS NOT NULL')}
     GROUP BY state
     ORDER BY count DESC
   `;
@@ -363,7 +373,7 @@ export async function getBreakdown(
       AVG(sentiment_score)::numeric(10,2) as avg_sentiment_score,
       COUNT(*) FILTER (WHERE churn_risk IN ('high', 'critical'))::int as high_churn_count
     FROM ${schemaPrefix}frontier_reviews_processed
-    ${whereClause} AND ${groupBy} IS NOT NULL
+    ${appendCondition(whereClause, `${groupBy} IS NOT NULL`)}
     GROUP BY ${groupBy}
     ORDER BY count DESC
     LIMIT 50

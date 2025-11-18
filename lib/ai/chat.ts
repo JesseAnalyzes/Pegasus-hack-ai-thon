@@ -7,9 +7,11 @@ import Anthropic from '@anthropic-ai/sdk';
 import { generateEmbedding, shouldUseKeywordSearch } from './embeddings';
 import { semanticSearchReviews, getReviews } from '../queries';
 import type { ReviewFilters, ChatRequest, ChatResponse } from '@/types';
+import config from '@/config';
 
+// Use config file first (for hackathon demo), then fall back to env vars
 const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY || '',
+  apiKey: config.anthropic.apiKey || process.env.ANTHROPIC_API_KEY || '',
 });
 
 /**
@@ -121,7 +123,7 @@ export async function processChatRequest(
   // Step 4: Call Claude API
   try {
     const response = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20241022', // Claude Sonnet 3.5
+      model: config.anthropic.model, // Use model from config
       max_tokens: 2048,
       system: buildSystemPrompt(),
       messages: messages as Anthropic.MessageParam[],

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useState, Suspense, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { FilterBar } from '@/components/dashboard/FilterBar';
 import { KPICard } from '@/components/dashboard/KPICard';
@@ -24,7 +24,7 @@ import {
 import type { SummaryStats, TimeSeriesPoint, BreakdownItem } from '@/types';
 import Link from 'next/link';
 
-const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+const COLORS = ['#3b82f6', '#f97316', '#fbbf24', '#10b981', '#8b5cf6'];
 
 function DashboardContent() {
   const searchParams = useSearchParams();
@@ -34,17 +34,18 @@ function DashboardContent() {
   const [recentReviews, setRecentReviews] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const buildFilters = () => {
-    const filters: Record<string, string> = {};
+  // Convert searchParams to stable string for dependency
+  const paramsString = useMemo(() => {
+    const params: Record<string, string> = {};
     searchParams.forEach((value, key) => {
-      filters[key] = value;
+      params[key] = value;
     });
-    return filters;
-  };
+    return JSON.stringify(params);
+  }, [searchParams]);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
-    const filters = buildFilters();
+    const filters: Record<string, string> = JSON.parse(paramsString);
     const queryString = new URLSearchParams(filters).toString();
 
     try {
@@ -82,20 +83,20 @@ function DashboardContent() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [paramsString]);
 
   useEffect(() => {
     fetchData();
-  }, [searchParams]);
+  }, [fetchData]);
 
   if (loading) {
     return (
-      <div className="p-8">
+      <div className="p-8 bg-dark-bg min-h-screen">
         <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-gray-200 rounded w-1/4"></div>
+          <div className="h-8 bg-dark-card rounded w-1/4"></div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-32 bg-gray-200 rounded"></div>
+              <div key={i} className="h-32 bg-dark-card rounded-xl border border-dark-border"></div>
             ))}
           </div>
         </div>
@@ -104,13 +105,23 @@ function DashboardContent() {
   }
 
   return (
-    <div className="p-8">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-600 mt-1">Overview of customer reviews and insights</p>
+    <div className="p-8 bg-dark-bg min-h-screen">
+      <div className="mb-6 flex items-center gap-4">
+        <div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img 
+            src="/nimbus_logo_white_transparent.png" 
+            alt="Nimbus Logo" 
+            className="h-20 w-auto object-contain"
+          />
+        </div>
+        <div>
+          <h1 className="text-3xl font-bold text-gray-100">AI Sentiment Intelligence Dashboard</h1>
+          <p className="text-gray-400 mt-1">Overview of customer reviews and insights</p>
+        </div>
       </div>
 
-      <FilterBar onFiltersChange={fetchData} />
+      <FilterBar />
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
@@ -129,6 +140,15 @@ function DashboardContent() {
           title="Avg Sentiment"
           value={summary?.avg_sentiment_score.toFixed(2) || '0.00'}
           icon={<TrendingUp className="w-8 h-8" />}
+          variant={
+            summary?.avg_sentiment_score 
+              ? summary.avg_sentiment_score > 0 
+                ? 'success' 
+                : summary.avg_sentiment_score < 0 
+                ? 'danger' 
+                : 'default'
+              : 'default'
+          }
         />
         <KPICard
           title="High Churn Risk"
@@ -147,12 +167,24 @@ function DashboardContent() {
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={trends}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Line type="monotone" dataKey="value" stroke="#3b82f6" name="Count" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                <XAxis dataKey="date" stroke="#9ca3af" />
+                <YAxis stroke="#9ca3af" />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                  labelStyle={{ color: '#e2e8f0' }}
+                  itemStyle={{ color: '#3b82f6' }}
+                />
+                <Legend wrapperStyle={{ color: '#9ca3af' }} />
+                <Line 
+                  type="monotone" 
+                  dataKey="value" 
+                  stroke="#3b82f6" 
+                  strokeWidth={3}
+                  name="Count"
+                  dot={{ fill: '#3b82f6', r: 4 }}
+                  activeDot={{ r: 6, fill: '#3b82f6', stroke: '#60a5fa', strokeWidth: 2 }}
+                />
               </LineChart>
             </ResponsiveContainer>
           </CardContent>
@@ -172,14 +204,22 @@ function DashboardContent() {
                   cx="50%"
                   cy="50%"
                   outerRadius={100}
-                  label
+                  label={{ fill: '#e2e8f0' }}
+                  strokeWidth={2}
                 >
                   {summary?.sentiment_breakdown.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    <Cell 
+                      key={`cell-${index}`} 
+                      fill={COLORS[index % COLORS.length]}
+                      stroke={COLORS[index % COLORS.length]}
+                    />
                   ))}
                 </Pie>
-                <Tooltip />
-                <Legend />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                  labelStyle={{ color: '#e2e8f0' }}
+                />
+                <Legend wrapperStyle={{ color: '#9ca3af' }} />
               </PieChart>
             </ResponsiveContainer>
           </CardContent>
@@ -195,12 +235,15 @@ function DashboardContent() {
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={summary?.churn_risk_breakdown || []}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="risk" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="count" fill="#ef4444" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                <XAxis dataKey="risk" stroke="#9ca3af" />
+                <YAxis stroke="#9ca3af" />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                  labelStyle={{ color: '#e2e8f0' }}
+                />
+                <Legend wrapperStyle={{ color: '#9ca3af' }} />
+                <Bar dataKey="count" fill="#f97316" radius={[8, 8, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -213,11 +256,14 @@ function DashboardContent() {
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={summary?.platform_counts || []}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="platform" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="count" fill="#3b82f6" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                <XAxis dataKey="platform" stroke="#9ca3af" />
+                <YAxis stroke="#9ca3af" />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                  labelStyle={{ color: '#e2e8f0' }}
+                />
+                <Bar dataKey="count" fill="#3b82f6" radius={[8, 8, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -231,57 +277,57 @@ function DashboardContent() {
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y divide-dark-border">
+              <thead className="bg-dark-bg/50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                     Date
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                     Platform
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                     Rating
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                     Sentiment
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                     Churn Risk
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                     Category
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                     Review
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="divide-y divide-dark-border">
                 {recentReviews.map((review) => (
-                  <tr key={review.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <tr key={review.id} className="hover:bg-dark-bg/50 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
                       {review.review_date}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
                       {review.platform}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
                       {review.rating}/5
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
                       {review.overall_sentiment || 'N/A'}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
                       {review.churn_risk || 'N/A'}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
                       {review.primary_category || 'N/A'}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-500">
+                    <td className="px-6 py-4 text-sm text-gray-400">
                       <Link
                         href={`/reviews/${review.id}`}
-                        className="text-indigo-600 hover:text-indigo-800"
+                        className="text-accent-blue hover:text-blue-400 transition-colors"
                       >
                         {review.review_text.substring(0, 120)}...
                       </Link>
@@ -300,12 +346,12 @@ function DashboardContent() {
 export default function DashboardPage() {
   return (
     <Suspense fallback={
-      <div className="p-8">
+      <div className="p-8 bg-dark-bg min-h-screen">
         <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-gray-200 rounded w-1/4"></div>
+          <div className="h-8 bg-dark-card rounded w-1/4"></div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-32 bg-gray-200 rounded"></div>
+              <div key={i} className="h-32 bg-dark-card rounded-xl border border-dark-border"></div>
             ))}
           </div>
         </div>
