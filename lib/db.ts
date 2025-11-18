@@ -1,28 +1,30 @@
 /**
  * Database connection layer for Nimbus
- * Uses pg (node-postgres) with connection pooling for Vercel compatibility
+ * Uses pg (node-postgres) with connection pooling
  */
 
 import { Pool } from 'pg';
+import config from '@/config';
 
 // Singleton pattern for database connection pool
 let pool: Pool | null = null;
 
 /**
  * Get or create the database connection pool
- * Uses DATABASE_URL environment variable
+ * Uses config file for hackathon demo, falls back to environment variables
  */
 export function getDb(): Pool {
   if (!pool) {
-    const connectionString = process.env.DATABASE_URL;
+    // Use config file first (for hackathon demo), then fall back to env vars
+    const connectionString = config.databaseUrl || process.env.DATABASE_URL;
     
     if (!connectionString) {
-      throw new Error('DATABASE_URL environment variable is not set');
+      throw new Error('Database configuration not found. Check config.ts or DATABASE_URL environment variable.');
     }
 
     pool = new Pool({
       connectionString,
-      // Connection pool settings for Vercel/serverless
+      // Connection pool settings
       max: 20, // Maximum number of clients in the pool
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 2000,
@@ -34,6 +36,8 @@ export function getDb(): Pool {
     pool.on('error', (err) => {
       console.error('Unexpected error on idle client', err);
     });
+
+    console.log('✅ Database connection pool initialized');
   }
 
   return pool;

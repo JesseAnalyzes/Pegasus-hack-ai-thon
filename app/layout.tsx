@@ -15,11 +15,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="antialiased">
+      <body className="antialiased bg-dark-bg">
         <ErrorBoundary>
-          <div className="flex h-screen bg-gray-50">
+          <div className="flex h-screen bg-dark-bg">
             <Sidebar />
-            <main className="flex-1 overflow-y-auto">
+            <main className="flex-1 overflow-y-auto bg-dark-bg">
               {children}
             </main>
           </div>

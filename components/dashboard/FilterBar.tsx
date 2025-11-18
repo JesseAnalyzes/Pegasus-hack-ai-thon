@@ -5,11 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/Card';
 import { X } from 'lucide-react';
 
-interface FilterBarProps {
-  onFiltersChange?: (filters: Record<string, any>) => void;
-}
-
-export function FilterBar({ onFiltersChange }: FilterBarProps) {
+export function FilterBar() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [filters, setFilters] = useState({
@@ -33,8 +29,7 @@ export function FilterBar({ onFiltersChange }: FilterBarProps) {
       }
     });
     router.replace(`?${params.toString()}`, { scroll: false });
-    onFiltersChange?.(filters);
-  }, [filters, router, onFiltersChange]);
+  }, [filters, router]);
 
   const updateFilter = (key: string, value: any) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
@@ -61,11 +56,11 @@ export function FilterBar({ onFiltersChange }: FilterBarProps) {
     <Card className="mb-6">
       <CardContent className="p-4">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-semibold text-gray-900">Filters</h3>
+          <h3 className="text-sm font-semibold text-gray-100">Filters</h3>
           {hasActiveFilters && (
             <button
               onClick={clearFilters}
-              className="text-sm text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
+              className="text-sm text-accent-blue hover:text-blue-400 flex items-center gap-1 transition-colors"
             >
               <X className="w-4 h-4" />
               Clear all
@@ -74,29 +69,29 @@ export function FilterBar({ onFiltersChange }: FilterBarProps) {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">
+            <label className="block text-xs font-medium text-gray-400 mb-1">
               Date From
             </label>
             <input
               type="date"
               value={filters.dateFrom}
               onChange={(e) => updateFilter('dateFrom', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+              className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded-md text-sm text-gray-300 focus:border-accent-blue focus:ring-1 focus:ring-accent-blue"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">
+            <label className="block text-xs font-medium text-gray-400 mb-1">
               Date To
             </label>
             <input
               type="date"
               value={filters.dateTo}
               onChange={(e) => updateFilter('dateTo', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+              className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded-md text-sm text-gray-300 focus:border-accent-blue focus:ring-1 focus:ring-accent-blue"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">
+            <label className="block text-xs font-medium text-gray-400 mb-1">
               Churn Risk
             </label>
             <select
@@ -106,7 +101,7 @@ export function FilterBar({ onFiltersChange }: FilterBarProps) {
                 const values = Array.from(e.target.selectedOptions, (opt) => opt.value);
                 updateFilter('churnRisk', values);
               }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+              className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded-md text-sm text-gray-300 focus:border-accent-blue focus:ring-1 focus:ring-accent-blue"
             >
               <option value="low">Low</option>
               <option value="medium">Medium</option>
@@ -115,7 +110,7 @@ export function FilterBar({ onFiltersChange }: FilterBarProps) {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">
+            <label className="block text-xs font-medium text-gray-400 mb-1">
               Sentiment
             </label>
             <select
@@ -125,7 +120,7 @@ export function FilterBar({ onFiltersChange }: FilterBarProps) {
                 const values = Array.from(e.target.selectedOptions, (opt) => opt.value);
                 updateFilter('overallSentiment', values);
               }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+              className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded-md text-sm text-gray-300 focus:border-accent-blue focus:ring-1 focus:ring-accent-blue"
             >
               <option value="very_negative">Very Negative</option>
               <option value="negative">Negative</option>
