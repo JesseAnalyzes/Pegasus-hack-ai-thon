@@ -35,6 +35,14 @@ env.example
 **/*credentials*.txt
 **/*secrets*.txt
 
+# setup and deployment documentation
+HACKATHON_SETUP.md
+VERCEL_DEPLOYMENT_ENV.md
+*DO_THIS_NOW.md
+CHANGES_FOR_HACKATHON.md
+*SETUP_STEPS.md
+CREATE_ENV_FILE.md
+
 # vercel
 .vercel
 
