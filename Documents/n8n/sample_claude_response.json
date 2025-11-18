@@ -1,0 +1,209 @@
+{
+  "metadata": {
+    "review_id": null,
+    "source_platform": "unknown",
+    "posted_date": null,
+    "review_language": "English",
+    "character_count": 1247,
+    "word_count": 217,
+    "is_verified_purchase": true
+  },
+  "reviewer_profile": {
+    "reviewer_type": "residential",
+    "location": {
+      "city": null,
+      "state": null,
+      "region": null,
+      "area_type": null
+    },
+    "customer_tenure": {
+      "duration_months": 8,
+      "tenure_category": "established"
+    },
+    "tech_savviness": "medium",
+    "use_cases": ["work_from_home", "remote_work"],
+    "criticality_level": "mission_critical"
+  },
+  "sentiment_analysis": {
+    "overall_sentiment": "very_negative",
+    "sentiment_score": -0.95,
+    "sentiment_intensity": "extreme",
+    "emotional_tone": ["frustrated", "angry", "stressed", "exhausted", "betrayed"],
+    "urgency_level": "critical",
+    "aspect_based_sentiment": {
+      "network_performance": {
+        "sentiment": "neutral",
+        "score": 0.0,
+        "mentioned": false
+      },
+      "pricing_billing": {
+        "sentiment": "very_negative",
+        "score": -1.0,
+        "mentioned": true
+      },
+      "customer_service": {
+        "sentiment": "very_negative",
+        "score": -0.9,
+        "mentioned": true
+      },
+      "installation_setup": {
+        "sentiment": "negative",
+        "score": -0.6,
+        "mentioned": true
+      },
+      "equipment_hardware": {
+        "sentiment": "negative",
+        "score": -0.5,
+        "mentioned": true
+      }
+    }
+  },
+  "classification": {
+    "primary_category": "Pricing & Billing",
+    "all_categories": [
+      "Pricing & Billing",
+      "Customer Service",
+      "Contracts & Terms",
+      "Overall Satisfaction"
+    ],
+    "subcategories": {
+      "billing_errors": true,
+      "incorrect_charges": true,
+      "missing_credits": true,
+      "double_billing": true,
+      "unauthorized_charges": true,
+      "equipment_charges": true,
+      "service_tier_issues": true,
+      "early_termination_fee": true,
+      "customer_support_failure": true,
+      "broken_promises": true,
+      "legal_action": true
+    },
+    "main_categories": [
+      "Pricing & Billing",
+      "Customer Service",
+      "Contracts & Terms",
+      "Overall Satisfaction"
+    ]
+  },
+  "technical_issues": {
+    "problems_identified": [
+      {
+        "issue": "Charged for installation that was supposed to be free",
+        "category": "billing_error",
+        "month": 1
+      },
+      {
+        "issue": "Double-billed for equipment",
+        "category": "billing_error",
+        "month": 2
+      },
+      {
+        "issue": "Charged for service tier never ordered",
+        "category": "billing_error",
+        "month": 3
+      },
+      {
+        "issue": "Promised $50 credit never appeared",
+        "category": "missing_credit",
+        "month": 4
+      },
+      {
+        "issue": "Charged for technician visit that never happened",
+        "category": "billing_error",
+        "month": 5
+      },
+      {
+        "issue": "Billed for equipment returned 3 months ago",
+        "category": "billing_error",
+        "month": 6
+      },
+      {
+        "issue": "Charged early termination fee while still under contract",
+        "category": "billing_error",
+        "month": 7
+      },
+      {
+        "issue": "Current bill shows $200 when it should be $65",
+        "category": "billing_error",
+        "month": 8
+      }
+    ],
+    "severity": "critical",
+    "frequency": "constant",
+    "resolution_status": "unresolved"
+  },
+  "metrics_extracted": {
+    "network_metrics": {
+      "speed_download": {
+        "value": null,
+        "unit": null,
+        "mentioned": false
+      },
+      "speed_upload": {
+        "value": null,
+        "unit": null,
+        "mentioned": false
+      },
+      "latency_ping": {
+        "value": null,
+        "unit": null,
+        "mentioned": false
+      },
+      "packet_loss": {
+        "value": null,
+        "unit": null,
+        "mentioned": false
+      }
+    },
+    "outage_metrics": {
+      "outage_count": 0,
+      "frequency": null,
+      "duration": null
+    },
+    "pricing_metrics": {
+      "advertised_price": 65.0,
+      "actual_bill_amount": 200.0,
+      "price_discrepancy": 135.0
+    },
+    "support_metrics": {
+      "contact_attempts": 8,
+      "average_wait_time_minutes": null,
+      "resolution_rate": 0.0
+    }
+  },
+  "churn_analysis": {
+    "churn_risk": "critical",
+    "churn_probability_score": 0.95,
+    "churn_indicators": [
+      "actively_looking_for_alternatives",
+      "legal_action_initiated",
+      "repeated_unresolved_issues",
+      "extreme_frustration",
+      "time_investment_exhaustion",
+      "broken_promises",
+      "considering_specific_competitor",
+      "explicit_high_churn_risk_statement"
+    ],
+    "switching_intent": {
+      "intent_expressed": true,
+      "intent_level": "high",
+      "timeline": "immediate",
+      "specific_competitor_mentioned": true
+    },
+    "retention_opportunity": false
+  },
+  "competitive_data": {
+    "competitors_mentioned": ["Xfinity"],
+    "previous_provider": null,
+    "satisfaction_vs_previous": null
+  },
+  "business_impact": {
+    "nps_indicator": "detractor",
+    "would_recommend": false,
+    "reputation_risk": "critical",
+    "resolution_urgency": "critical"
+  }
+}
+
+

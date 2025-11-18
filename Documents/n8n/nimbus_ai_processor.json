@@ -1,0 +1,774 @@
+{
+  "name": "Claude AI Review Extraction",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 120
+            }
+          ]
+        }
+      },
+      "id": "a6fa3e7d-982c-427b-b1c1-005f76e30e33",
+      "name": "Cron Trigger (every X minutes)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1536,
+        208
+      ],
+      "notes": "Configure interval in node settings. Set 'Skip if already running' in workflow settings."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "cc095145-86f2-4a04-bbe4-47ec97b65edc",
+              "name": "max_records",
+              "value": 10,
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3c13935e-eac1-4cfc-85fe-449228653ad2",
+      "name": "Set → Parameters",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1376,
+        208
+      ],
+      "notes": "max_records: 0 = process all, N = process N records"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  id, review_id, platform, review_date, rating, reviewer_name, location,\n  review_text, helpful_count, review_url, title, verified_reviewer,\n  verified_customer, local_guide\nFROM team_pegasus.frontier_reviews\nWHERE is_processed = false\nORDER BY id ASC\nLIMIT CASE WHEN CAST( $1 AS INTEGER) > 0 THEN CAST($1 AS INTEGER) ELSE 999999 END;",
+        "options": {
+          "queryReplacement": "{{ $json.max_records }}"
+        }
+      },
+      "id": "aba906e8-80ed-4596-aca1-09c4d7a8654c",
+      "name": "Postgres → Get Unprocessed Reviews",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        -1232,
+        208
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "8VvvFZVfssWZe1JJ",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "hasRecords",
+              "leftValue": "={{ $json.length || $input.all().length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "652cb614-c8f3-4302-95a8-f956daa86e8c",
+      "name": "IF → Has Records?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.1,
+      "position": [
+        -1056,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT review_id, processing_status\nFROM team_pegasus.frontier_reviews_processed\nWHERE review_id = $1\nLIMIT 1;",
+        "options": {
+          "queryReplacement": "={{ $json.review_id }}"
+        }
+      },
+      "id": "3b059990-96ba-4ff3-b4ac-463dd50a5cfb",
+      "name": "Postgres → Check if Already Processed",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        -608,
+        144
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "8VvvFZVfssWZe1JJ",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "passThrough",
+        "options": {}
+      },
+      "id": "bc3acca0-4743-46b2-9358-ea4a15800301",
+      "name": "Merge → After Migration Check",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [
+        464,
+        96
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "functionCode": "const review = $('Loop Over Items').first().json;\n\n// Function node to build Claude API request dynamically\n// This avoids duplication by constructing the schema once\n\n// Import the schema (in n8n, you'd store this as a workflow variable or load from file)\nconst extractionSchema = {\n  \"schema_version\": \"1.0\",\n  \"description\": \"Complete attribute schema that Claude LLM can extract from telecom reviews\",\n  \"categories\": {\n    \"metadata\": {\n      \"review_id\": \"string\",\n      \"source_platform\": \"enum\",\n      \"posted_date\": \"date\",\n      \"review_language\": \"string\",\n      \"character_count\": \"integer\",\n      \"word_count\": \"integer\",\n      \"is_verified_purchase\": \"boolean\"\n    },\n    \"reviewer_profile\": {\n      \"reviewer_type\": \"enum[residential, business, senior, student]\",\n      \"location\": {\n        \"city\": \"string\",\n        \"state\": \"string\",\n        \"region\": \"enum\",\n        \"area_type\": \"enum[urban, suburban, rural]\"\n      },\n      \"customer_tenure\": {\n        \"duration_months\": \"integer\",\n        \"tenure_category\": \"enum[new_customer, established, long_term, very_long_term]\"\n      },\n      \"tech_savviness\": \"enum[low, medium, high, expert]\",\n      \"use_cases\": \"array[string]\",\n      \"criticality_level\": \"enum[casual, moderate, important, mission_critical]\"\n    },\n    \"sentiment_analysis\": {\n      \"overall_sentiment\": \"enum[very_positive, positive, neutral, negative, very_negative, mixed]\",\n      \"sentiment_score\": \"float[-1.0 to 1.0]\",\n      \"sentiment_intensity\": \"enum[mild, moderate, strong, extreme]\",\n      \"emotional_tone\": \"array[string]\",\n      \"urgency_level\": \"enum[low, medium, high, critical]\",\n      \"aspect_based_sentiment\": {\n        \"network_performance\": \"object\",\n        \"pricing_billing\": \"object\",\n        \"customer_service\": \"object\",\n        \"installation_setup\": \"object\",\n        \"equipment_hardware\": \"object\"\n      }\n    },\n    \"classification\": {\n      \"primary_category\": \"string\",\n      \"all_categories\": \"array[string]\",\n      \"subcategories\": \"object\",\n      \"main_categories\": [\n        \"Network Performance\",\n        \"Pricing & Billing\",\n        \"Customer Service\",\n        \"Installation & Setup\",\n        \"Equipment & Hardware\",\n        \"Contracts & Terms\",\n        \"Overall Satisfaction\",\n        \"Coverage & Availability\",\n        \"Competitive Comparison\"\n      ]\n    },\n    \"technical_issues\": {\n      \"problems_identified\": \"array[object]\",\n      \"severity\": \"enum[low, medium, high, critical]\",\n      \"frequency\": \"enum[one_time, rare, occasional, frequent, constant]\",\n      \"resolution_status\": \"enum[unresolved, partially_resolved, resolved, worsening]\"\n    },\n    \"metrics_extracted\": {\n      \"network_metrics\": {\n        \"speed_download\": \"object\",\n        \"speed_upload\": \"object\",\n        \"latency_ping\": \"object\",\n        \"packet_loss\": \"object\"\n      },\n      \"outage_metrics\": {\n        \"outage_count\": \"integer\",\n        \"frequency\": \"string\",\n        \"duration\": \"string\"\n      },\n      \"pricing_metrics\": {\n        \"advertised_price\": \"float\",\n        \"actual_bill_amount\": \"float\",\n        \"price_discrepancy\": \"float\"\n      },\n      \"support_metrics\": {\n        \"contact_attempts\": \"integer\",\n        \"average_wait_time_minutes\": \"integer\",\n        \"resolution_rate\": \"float\"\n      }\n    },\n    \"churn_analysis\": {\n      \"churn_risk\": \"enum[low, medium, high, critical]\",\n      \"churn_probability_score\": \"float[0-1]\",\n      \"churn_indicators\": \"array[string]\",\n      \"switching_intent\": \"object\",\n      \"retention_opportunity\": \"boolean\"\n    },\n    \"competitive_data\": {\n      \"competitors_mentioned\": \"array[string]\",\n      \"previous_provider\": \"string\",\n      \"satisfaction_vs_previous\": \"enum\"\n    },\n    \"business_impact\": {\n      \"nps_indicator\": \"enum[detractor, passive, promoter]\",\n      \"would_recommend\": \"boolean\",\n      \"reputation_risk\": \"enum[low, medium, high, critical]\",\n      \"resolution_urgency\": \"enum[low, medium, high, critical]\"\n    }\n  }\n};\n\n// Get review text from previous node\nconst reviewText = review.review_text;\n\n// Build the prompt content\nconst promptContent = `Extract information from this telecom review according to the following schema:\n\n${JSON.stringify(extractionSchema, null, 2)}\n\nReview to analyze:\n${reviewText}\n\nRespond with a JSON object containing all extracted fields. Return only the raw JSON without any markdown formatting.`;\n\n// Build the complete Claude API request\nconst claudeRequest = {\n  model: \"claude-sonnet-4-5-20250929\",\n  max_tokens: 4096,\n  temperature: 0.0,\n  system: \"You are an expert at extracting structured information from telecom customer reviews. Always respond with valid JSON matching the provided schema. Do not include any markdown formatting or code blocks - return only the raw JSON object.\",\n  messages: [\n    {\n      role: \"user\",\n      content: promptContent\n    }\n  ]\n};\n\n// Return the request as output\nreturn [{\n  json: claudeRequest\n}];\n\n"
+      },
+      "id": "d0b286a0-97d9-41ed-82f4-ad5e796e10ed",
+      "name": "Function → Prepare Claude Request",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        800,
+        96
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "functionCode": "// Enhanced Claude Response Parser with Fallback to Original Data\n// This ensures all fields are populated, using Claude data when available,\n// and falling back to original review data when Claude returns null\n\n// ============================================================================\n// PART 1: Get Original Review Data and Claude Response\n// ============================================================================\n// Enhanced Claude Response Parser with Fallback to Original Data\nconst reviewData = $('Loop Over Items').first().json;\nconst claudeResponse = $json;\n\nconsole.log('Processing Review ID:', reviewData.id);\n\n// Parse Claude Response\nlet extractedText = '';\nlet aiAttributes = {};\n\ntry {\n  if (claudeResponse.content && Array.isArray(claudeResponse.content)) {\n    const textBlock = claudeResponse.content.find(block => block.type === 'text');\n    if (textBlock) {\n      extractedText = textBlock.text;\n    }\n  }\n  \n  try {\n    aiAttributes = JSON.parse(extractedText);\n  } catch (parseError) {\n    const jsonMatch = extractedText.match(/```json\\n([\\s\\S]*?)\\n```/);\n    if (jsonMatch) {\n      aiAttributes = JSON.parse(jsonMatch[1]);\n    }\n  }\n  \n} catch (error) {\n  console.error('Parse error:', error.message);\n  aiAttributes = {};\n}\n\n// Calculate Geographic Metadata\nconst location = reviewData.location || '';\nlet city = null;\nlet state = null;\nlet region = null;\nlet area_type = null;\n\nif (location) {\n  if (location.includes(',')) {\n    const parts = location.split(',').map(s => s.trim());\n    city = parts[0] || null;\n    state = parts[1] || null;\n    \n    const stateRegionMap = {\n      'CA': 'West Coast', 'TX': 'South', 'FL': 'South',\n      'NY': 'Northeast', 'IL': 'Midwest'\n    };\n    region = stateRegionMap[state] || 'Other';\n  } else if (location.toLowerCase().includes('rural')) {\n    city = location;\n    area_type = 'rural';\n  }\n  \n  if (!area_type) {\n    const urbanCities = ['Los Angeles, CA', 'Houston, TX', 'Dallas, TX', 'Austin, TX'];\n    area_type = urbanCities.includes(location) ? 'urban' : 'suburban';\n  }\n}\n\n// Calculate Temporal Metadata\nconst reviewDate = new Date(reviewData.review_date);\nconst isValidDate = reviewData.review_date && !isNaN(reviewDate.getTime());\n\nlet year = null;\nlet month = null;\nlet quarter = null;\nlet weekOfYear = null;\nlet daysAgo = null;\n\nif (isValidDate) {\n  year = reviewDate.getFullYear();\n  month = reviewDate.getMonth() + 1;\n  quarter = 'Q' + Math.ceil(month / 3) + ' ' + year;\n  \n  const d = new Date(Date.UTC(reviewDate.getFullYear(), reviewDate.getMonth(), reviewDate.getDate()));\n  const dayNum = d.getUTCDay() || 7;\n  d.setUTCDate(d.getUTCDate() + 4 - dayNum);\n  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));\n  weekOfYear = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);\n  \n  daysAgo = Math.floor((Date.now() - reviewDate.getTime()) / (1000 * 60 * 60 * 24));\n}\n\n// Extract Fields\nconst sentiment_score = aiAttributes.sentiment_analysis?.sentiment_score || null;\nconst overall_sentiment = aiAttributes.sentiment_analysis?.overall_sentiment || null;\nconst sentiment_intensity = aiAttributes.sentiment_analysis?.sentiment_intensity || null;\nconst urgency_level = aiAttributes.sentiment_analysis?.urgency_level || null;\nconst churn_risk = aiAttributes.churn_analysis?.churn_risk || null;\nconst churn_probability_score = aiAttributes.churn_analysis?.churn_probability_score || null;\nconst retention_opportunity = aiAttributes.churn_analysis?.retention_opportunity || false;\nconst primary_category = aiAttributes.classification?.primary_category || null;\nconst nps_indicator = aiAttributes.business_impact?.nps_indicator || null;\nconst reputation_risk = aiAttributes.business_impact?.reputation_risk || null;\nconst resolution_urgency = aiAttributes.business_impact?.resolution_urgency || null;\nconst reviewer_type = aiAttributes.reviewer_profile?.reviewer_type || 'residential';\nconst customer_tenure_months = aiAttributes.reviewer_profile?.customer_tenure?.duration_months || null;\nconst tenure_category = aiAttributes.reviewer_profile?.customer_tenure?.tenure_category || null;\nconst tech_savviness = aiAttributes.reviewer_profile?.tech_savviness || 'medium';\nconst issue_severity = aiAttributes.technical_issues?.severity || null;\nconst issue_frequency = aiAttributes.technical_issues?.frequency || null;\nconst resolution_status = aiAttributes.technical_issues?.resolution_status || 'unresolved';\n\n// Fallback for would_recommend\nlet would_recommend = aiAttributes.business_impact?.would_recommend;\nif (would_recommend === null || would_recommend === undefined) {\n  would_recommend = reviewData.rating >= 4 ? true : (reviewData.rating <= 2 ? false : null);\n}\n\n// Build Output\nreturn [{\n  json: {\n    review_id: reviewData.id || reviewData.review_id,\n    platform: reviewData.platform,\n    review_date: reviewData.review_date,\n    rating: reviewData.rating,\n    reviewer_name: reviewData.reviewer_name,\n    location: reviewData.location,\n    review_text: reviewData.review_text,\n    helpful_count: reviewData.helpful_count || 0,\n    review_url: reviewData.review_url,\n    title: reviewData.title || '',\n    verified_reviewer: reviewData.verified_reviewer || false,\n    verified_customer: reviewData.verified_customer || false,\n    local_guide: reviewData.local_guide || false,\n    city: city,\n    state: state,\n    region: region,\n    area_type: area_type,\n    date_parsed: reviewData.review_date,\n    year: year,\n    month: month,\n    quarter: quarter,\n    week_of_year: weekOfYear,\n    days_ago: daysAgo,\n    sentiment_score: sentiment_score,\n    overall_sentiment: overall_sentiment,\n    sentiment_intensity: sentiment_intensity,\n    urgency_level: urgency_level,\n    churn_risk: churn_risk,\n    churn_probability_score: churn_probability_score,\n    retention_opportunity: retention_opportunity,\n    primary_category: primary_category,\n    nps_indicator: nps_indicator,\n    would_recommend: would_recommend,\n    reputation_risk: reputation_risk,\n    resolution_urgency: resolution_urgency,\n    reviewer_type: reviewer_type,\n    customer_tenure_months: customer_tenure_months,\n    tenure_category: tenure_category,\n    tech_savviness: tech_savviness,\n    issue_severity: issue_severity,\n    issue_frequency: issue_frequency,\n    resolution_status: resolution_status,\n    ai_attributes: aiAttributes,\n    processing_status: 'claude_processed',\n    claude_model: claudeResponse.model || 'claude-sonnet-4-5-20250929',\n    tokens_used: claudeResponse.usage ? {\n      input: claudeResponse.usage.input_tokens || 0,\n      output: claudeResponse.usage.output_tokens || 0,\n      total: (claudeResponse.usage.input_tokens || 0) + (claudeResponse.usage.output_tokens || 0)\n    } : null,\n    processing_timestamp: new Date().toISOString()\n  }\n}];\n\n"
+      },
+      "id": "d5013105-2099-49d8-959a-f843a4b7211a",
+      "name": "Function → Parse Claude Response",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        864,
+        -480
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- PostgreSQL INSERT with positional parameters ($1, $2, $3...)\n-- Use this in n8n Postgres node\n\nINSERT INTO team_pegasus.frontier_reviews_processed (\n  review_id, platform, review_date, rating, reviewer_name, location,\n  review_text, helpful_count, review_url, title, verified_reviewer,\n  verified_customer, local_guide, city, state, region, area_type,\n  date_parsed, year, month, quarter, week_of_year, days_ago,\n  processing_status, ai_attributes,\n  sentiment_score, overall_sentiment, sentiment_intensity, urgency_level,\n  churn_risk, churn_probability_score, retention_opportunity,\n  primary_category, nps_indicator, would_recommend, reputation_risk,\n  resolution_urgency, reviewer_type, customer_tenure_months,\n  tenure_category, tech_savviness, issue_severity, issue_frequency,\n  resolution_status, last_processed_at\n)\nVALUES (\n  $1, $2, $3, $4, $5, $6,\n  $7, $8, $9, $10, $11,\n  $12, $13, $14, $15, $16, $17,\n  $18, $19, $20, $21, $22, $23,\n  $24, $25::jsonb,\n  $26, $27, $28, $29,\n  $30, $31, $32,\n  $33, $34, $35, $36,\n  $37, $38, $39,\n  $40, $41, $42, $43,\n  $44, NOW()\n)\nON CONFLICT (review_id)\nDO UPDATE SET\n  processing_status = EXCLUDED.processing_status,\n  ai_attributes = EXCLUDED.ai_attributes,\n  city = EXCLUDED.city,\n  state = EXCLUDED.state,\n  region = EXCLUDED.region,\n  area_type = EXCLUDED.area_type,\n  date_parsed = EXCLUDED.date_parsed,\n  year = EXCLUDED.year,\n  month = EXCLUDED.month,\n  quarter = EXCLUDED.quarter,\n  week_of_year = EXCLUDED.week_of_year,\n  days_ago = EXCLUDED.days_ago,\n  sentiment_score = EXCLUDED.sentiment_score,\n  overall_sentiment = EXCLUDED.overall_sentiment,\n  sentiment_intensity = EXCLUDED.sentiment_intensity,\n  urgency_level = EXCLUDED.urgency_level,\n  churn_risk = EXCLUDED.churn_risk,\n  churn_probability_score = EXCLUDED.churn_probability_score,\n  retention_opportunity = EXCLUDED.retention_opportunity,\n  primary_category = EXCLUDED.primary_category,\n  nps_indicator = EXCLUDED.nps_indicator,\n  would_recommend = EXCLUDED.would_recommend,\n  reputation_risk = EXCLUDED.reputation_risk,\n  resolution_urgency = EXCLUDED.resolution_urgency,\n  reviewer_type = EXCLUDED.reviewer_type,\n  customer_tenure_months = EXCLUDED.customer_tenure_months,\n  tenure_category = EXCLUDED.tenure_category,\n  tech_savviness = EXCLUDED.tech_savviness,\n  issue_severity = EXCLUDED.issue_severity,\n  issue_frequency = EXCLUDED.issue_frequency,\n  resolution_status = EXCLUDED.resolution_status,\n  last_processed_at = NOW(),\n  updated_at = NOW();\n\n",
+        "options": {
+          "queryReplacement": "={{ $json.review_id }}, {{ $json.platform }}, {{ $json.review_date }}, {{ $json.rating }}, {{ $json.reviewer_name }}, {{ $json.location }}, {{ $json.review_text }}, {{ $json.helpful_count }}, {{ $json.review_url }}, {{ $json.title }}, {{ $json.verified_reviewer }}, {{ $json.verified_customer }}, {{ $json.local_guide }}, {{ $json.city }}, {{ $json.state }}, {{ $json.region }}, {{ $json.area_type }}, {{ $json.date_parsed }}, {{ $json.year }}, {{ $json.month }}, {{ $json.quarter }}, {{ $json.week_of_year }}, {{ $json.days_ago }}, {{ $json.processing_status }}, {{ JSON.stringify($json.ai_attributes) }}, {{ $json.sentiment_score }}, {{ $json.overall_sentiment }}, {{ $json.sentiment_intensity }}, {{ $json.urgency_level }}, {{ $json.churn_risk }}, {{ $json.churn_probability_score }}, {{ $json.retention_opportunity }}, {{ $json.primary_category }}, {{ $json.nps_indicator }}, {{ $json.would_recommend }}, {{ $json.reputation_risk }}, {{ $json.resolution_urgency }}, {{ $json.reviewer_type }}, {{ $json.customer_tenure_months }}, {{ $json.tenure_category }}, {{ $json.tech_savviness }}, {{ $json.issue_severity }}, {{ $json.issue_frequency }}, {{ $json.resolution_status }}"
+        }
+      },
+      "id": "4d72dc30-1db9-4c0b-93b5-4190fde43832",
+      "name": "Postgres → Insert/Update (Claude Processed)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        1056,
+        -480
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "8VvvFZVfssWZe1JJ",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Prepare text for GTE embedding\nconst reviewData = $('Loop Over Items').first().json;\nconst textToEmbed = [reviewData.title, reviewData.review_text].filter(Boolean).join(' ');\n\nreturn [{\n  json: {\n    review_id: reviewData.id,\n    review_data: reviewData,\n    text_to_embed: textToEmbed\n  }\n}];"
+      },
+      "id": "4ae1fdeb-8cc6-4cba-8c73-8898afe22500",
+      "name": "Function → Prepare GTE Embedding",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1264,
+        -480
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://dbc-4a93b454-f17b.cloud.databricks.com/serving-endpoints/databricks-gte-large-en/invocations",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n    \"input\": [\"{{ $json.text_to_embed }}\"]\n  }",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "6588653f-17f1-4cab-a19a-ac4f8a7859c6",
+      "name": "HTTP → GTE Embedding API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1472,
+        -480
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "JoKENnnyWMvFDz5R",
+          "name": "Bearer Auth account"
+        }
+      },
+      "notes": "Call GTE embedding API. Update URL and auth based on your GTE service."
+    },
+    {
+      "parameters": {
+        "functionCode": "// Parse Databricks GTE Embedding Response (OpenAI-compatible format)\nconst embeddingResponse = $json;\n//const reviewData = $input.first().json;\nconst reviewData = $('Loop Over Items').first().json;\n\nconsole.log('Processing embedding for review:', reviewData.review_id);\n\nlet embedding = null;\nlet embeddingString = null;\n\ntry {\n  // OpenAI-compatible format: { \"data\": [{ \"embedding\": [...] }] }\n  if (embeddingResponse.data && Array.isArray(embeddingResponse.data)) {\n    embedding = embeddingResponse.data[0].embedding;\n    console.log('✓ Found embedding in OpenAI format (data array)');\n  }\n  // Databricks format: { \"predictions\": [[...]] }\n  else if (embeddingResponse.predictions && Array.isArray(embeddingResponse.predictions)) {\n    embedding = embeddingResponse.predictions[0];\n    console.log('✓ Found embedding in Databricks format (predictions)');\n  }\n  // Direct array format\n  else if (Array.isArray(embeddingResponse)) {\n    embedding = embeddingResponse[0];\n    console.log('✓ Found embedding in direct array');\n  }\n  // Object with embedding key\n  else if (embeddingResponse.embedding) {\n    embedding = embeddingResponse.embedding;\n    console.log('✓ Found embedding in object');\n  }\n  else {\n    throw new Error('Unexpected response format: ' + JSON.stringify(embeddingResponse).substring(0, 200));\n  }\n  \n  // Validate embedding\n  if (!Array.isArray(embedding) || embedding.length === 0) {\n    throw new Error('Embedding is not a valid array. Got: ' + typeof embedding);\n  }\n  \n  // Convert to PostgreSQL vector format: '[0.1,0.2,0.3,...]'\n  embeddingString = '[' + embedding.join(',') + ']';\n  \n  console.log('✓ Embedding dimension:', embedding.length);\n  console.log('✓ First 5 values:', embedding.slice(0, 5));\n  console.log('✓ Model:', embeddingResponse.model);\n  \n} catch (error) {\n  console.error('❌ Failed to parse embedding:', error.message);\n  console.error('Response keys:', Object.keys(embeddingResponse));\n  throw new Error('Embedding parse error: ' + error.message);\n}\n\n// Return complete data with embedding\nreturn [{\n  json: {\n    // All previous data\n    ...reviewData,\n    \n    // Add embedding data\n    gte_embedding: embeddingString,\n    embedding_array: embedding,\n    embedding_dimension: embedding.length,\n    embedding_model: embeddingResponse.model || 'databricks-gte-large-en',\n    embedding_created_at: new Date().toISOString(),\n    \n    // Token usage (if available)\n    embedding_tokens: embeddingResponse.usage?.total_tokens || null,\n    \n    // Update processing status\n    processing_status: 'completed'\n  }\n}];\n\n"
+      },
+      "id": "e8ec9662-e231-495e-b68a-b494d1182106",
+      "name": "Function → Parse GTE Embedding",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1680,
+        -480
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE team_pegasus.frontier_reviews_processed\nSET\n  gte_embedding = $1::vector,\n  embedding_model = 'gte-base',\n  embedding_created_at = NOW(),\n  processing_status = 'vector_processed',\n  last_processed_at = NOW(),\n  updated_at = NOW()\nWHERE review_id = $2;",
+        "options": {
+          "queryReplacement": "{{ $json.gte_embedding }},{{ $json.review_id }}"
+        }
+      },
+      "id": "03d78d3e-944c-47bd-b979-a37d419ef742",
+      "name": "Postgres → Update Embedding",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        1936,
+        -480
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "HXJ5ic1ZBgUDE8cv",
+          "name": "Postgres account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE team_pegasus.frontier_reviews_processed\nSET\n  processing_status = 'completed',\n  last_processed_at = NOW(),\n  updated_at = NOW()\nWHERE review_id = $1;\n\nUPDATE team_pegasus.frontier_reviews\nSET is_processed = true\nWHERE id = $1;",
+        "options": {
+          "queryReplacement": "={{ $('Loop Over Items').first().json.review_id }}"
+        }
+      },
+      "id": "918d451b-381c-49e6-8ca8-830b3f6440cc",
+      "name": "Postgres → Mark Completed",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        2224,
+        -480
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "HXJ5ic1ZBgUDE8cv",
+          "name": "Postgres account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Error handler - mark as errored\nconst error = $input.first().error || {};\nconst reviewData = $('Function → Prepare Claude Request').first()?.json?.review_data ||\n                    $('Function → Prepare GTE Embedding').first()?.json?.review_data ||\n                    { id: 'unknown' };\n\nreturn [{\n  json: {\n    review_id: reviewData.id || reviewData.review_id,\n    error_message: error.message || 'Unknown error',\n    error_details: JSON.stringify(error),\n    processing_status: 'errored'\n  }\n}];"
+      },
+      "id": "1111cdee-b76a-4d5b-83cc-ce7543d52150",
+      "name": "Function → Error Handler",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1536,
+        96
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE frontier_reviews_processed\nSET\n  processing_status = 'errored',\n  error_message = :error_message,\n  processing_attempts = COALESCE(processing_attempts, 0) + 1,\n  last_processed_at = NOW(),\n  updated_at = NOW()\nWHERE review_id = :review_id;\n\n-- Also try to insert if it doesn't exist (in case error happened before insert)\nINSERT INTO frontier_reviews_processed (\n  review_id, platform, review_date, rating, reviewer_name, location,\n  review_text, processing_status, error_message, processing_attempts,\n  last_processed_at\n)\nSELECT\n  id, platform, review_date, rating, reviewer_name, location,\n  review_text, 'errored', :error_message, 1, NOW()\nFROM frontier_reviews\nWHERE id = :review_id\nON CONFLICT (review_id) DO NOTHING;",
+        "options": {}
+      },
+      "id": "94dcba4d-13c6-4fce-8347-f9e379712cc6",
+      "name": "Postgres → Mark Errored",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        1824,
+        112
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "HXJ5ic1ZBgUDE8cv",
+          "name": "Postgres account 2"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "17483159-322a-4718-ad91-0a9c2c4a85ed",
+      "name": "Done (no records)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -864,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "notInProcessed",
+              "leftValue": "={{ $json.length || 0 }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "eq"
+              }
+            },
+            {
+              "id": "7f1ef078-7ff2-4143-a59d-94238914ace3",
+              "leftValue": "={{ $json.length || $input.all().length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "9699020e-58f5-43c2-9d29-495cbb5daa80",
+      "name": "IF → Has Metadata?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.1,
+      "position": [
+        -336,
+        144
+      ],
+      "alwaysOutputData": true,
+      "notes": "If record not in processed table, migrate it first"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Calculate metadata for migration (same logic as Python script)\n//const review = $('Split In Batches (1 at a time)').first().json;\n\nconst review = $('Loop Over Items').first().json;\n\nconsole.log(review)\n\n// Calculate geographic metadata from location\nconst location = review.location || '';\nlet city = null, state = null, region = null, area_type = null;\n\nif (location.includes(',')) {\n  const parts = location.split(',').map(s => s.trim());\n  city = parts[0] || null;\n  state = parts[1] || null;\n  \n  // Determine region from state\n  if (state === 'CA') region = 'West Coast';\n  else if (state === 'TX') region = 'South';\n  else region = 'Other';\n} else if (location.startsWith('Rural')) {\n  city = location;\n  area_type = 'rural';\n}\n\n// Determine area type\nif (!area_type) {\n  const urbanCities = ['Los Angeles, CA', 'San Diego, CA', 'San Jose, CA', 'San Francisco, CA', 'Fresno, CA', 'Sacramento, CA', 'Long Beach, CA', 'Oakland, CA', 'Houston, TX', 'Dallas, TX', 'San Antonio, TX', 'Austin, TX', 'Fort Worth, TX', 'El Paso, TX', 'Arlington, TX', 'Corpus Christi, TX'];\n  if (urbanCities.includes(location)) {\n    area_type = 'urban';\n  } else {\n    area_type = 'suburban';\n  }\n}\n\n// Calculate temporal metadata from review_date\nconst reviewDate = new Date(review.review_date);\nconst year = reviewDate.getFullYear();\nconst month = reviewDate.getMonth() + 1;\nconst quarter = 'Q' + Math.ceil(month / 3) + ' ' + year;\n\n// Calculate ISO week number\nfunction getWeekNumber(date) {\n  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));\n  const dayNum = d.getUTCDay() || 7;\n  d.setUTCDate(d.getUTCDate() + 4 - dayNum);\n  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));\n  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);\n}\nconst weekOfYear = getWeekNumber(reviewDate);\nconst daysAgo = Math.floor((new Date() - reviewDate) / (1000 * 60 * 60 * 24));\n\nreturn [{\n  json: {\n    review_id: review.review_id || review.id,\n    platform: review.platform,\n    review_date: review.review_date,\n    rating: review.rating,\n    reviewer_name: review.reviewer_name,\n    location: review.location,\n    review_text: review.review_text,\n    helpful_count: review.helpful_count || 0,\n    review_url: review.review_url,\n    title: review.title,\n    verified_reviewer: review.verified_reviewer,\n    verified_customer: review.verified_customer,\n    local_guide: review.local_guide,\n    // Geographic metadata\n    city: city,\n    state: state,\n    region: region,\n    area_type: area_type,\n    // Temporal metadata\n    date_parsed: review.review_date,\n    year: year,\n    month: month,\n    quarter: quarter,\n    week_of_year: weekOfYear,\n    days_ago: daysAgo,\n    // Processing status\n    processing_status: 'pending',\n    // Empty AI attributes (will be populated by Claude)\n    ai_attributes: {}\n  }\n}];"
+      },
+      "id": "cf29e1be-7a88-466a-8573-1be8391ba806",
+      "name": "Function → Calculate Metadata",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -32,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO team_pegasus.frontier_reviews_processed (\n  review_id, platform, review_date, rating, reviewer_name, location,\n  review_text, helpful_count, review_url, title, verified_reviewer,\n  verified_customer, local_guide,\n  city, state, region, area_type,\n  date_parsed, year, month, quarter, week_of_year, days_ago,\n  processing_status, ai_attributes\n)\nVALUES (\n  $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19,$20, $21, $22, $23, $24, $25\n)\nON CONFLICT (review_id) DO NOTHING;",
+        "options": {
+          "queryReplacement": "{{ $json.review_id }}, {{ $json.platform }}, {{ $json.review_date }}, {{ $json.rating }}, {{ $json.reviewer_name }}, {{ $json.location }},   {{ $json.review_text }}, {{ $json.helpful_count }}, {{ $json.review_url }}, {{ $json.title }}, {{ $json.verified_reviewer }},   {{ $json.verified_customer }}, {{ $json.local_guide }},   {{ $json.city }}, {{ $json.state }}, {{ $json.region }}, {{ $json.area_type }},   {{ $json.date_parsed }}, {{ $json.year }}, {{ $json.month }}, {{ $json.quarter }}, {{ $json.week_of_year }}, {{ $json.days_ago }},   {{ $json.processing_status }}, {{ $json.ai_attributes }}"
+        }
+      },
+      "id": "a6ea75e7-83dc-42bd-8470-c21613a55178",
+      "name": "Postgres → Insert Record to Processed Table",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        224,
+        208
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "8VvvFZVfssWZe1JJ",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "df637564-65c1-41ba-8961-562fd5deaf5e",
+      "name": "Claude AI Extraction",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        656,
+        -480
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "Yrzx98DrPmwlWJs5",
+          "name": "Header Auth account"
+        },
+        "anthropicApi": {
+          "id": "Nkgn1ozqdDtVKFsC",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -848,
+        128
+      ],
+      "id": "5d55b071-91c9-4697-8c44-77aa13f215dc",
+      "name": "Loop Over Items"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Cron Trigger (every X minutes)": {
+      "main": [
+        [
+          {
+            "node": "Set → Parameters",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set → Parameters": {
+      "main": [
+        [
+          {
+            "node": "Postgres → Get Unprocessed Reviews",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres → Get Unprocessed Reviews": {
+      "main": [
+        [
+          {
+            "node": "IF → Has Records?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF → Has Records?": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Done (no records)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres → Check if Already Processed": {
+      "main": [
+        [
+          {
+            "node": "IF → Has Metadata?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge → After Migration Check": {
+      "main": [
+        [
+          {
+            "node": "Function → Prepare Claude Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Function → Prepare Claude Request": {
+      "main": [
+        [
+          {
+            "node": "Function → Error Handler",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Claude AI Extraction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Function → Parse Claude Response": {
+      "main": [
+        [
+          {
+            "node": "Postgres → Insert/Update (Claude Processed)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Function → Error Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres → Insert/Update (Claude Processed)": {
+      "main": [
+        [
+          {
+            "node": "Function → Prepare GTE Embedding",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Function → Error Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Function → Prepare GTE Embedding": {
+      "main": [
+        [
+          {
+            "node": "HTTP → GTE Embedding API",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Function → Error Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP → GTE Embedding API": {
+      "main": [
+        [
+          {
+            "node": "Function → Parse GTE Embedding",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Function → Error Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Function → Parse GTE Embedding": {
+      "main": [
+        [
+          {
+            "node": "Postgres → Update Embedding",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Function → Error Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres → Update Embedding": {
+      "main": [
+        [
+          {
+            "node": "Postgres → Mark Completed",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Function → Error Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres → Mark Completed": {
+      "main": [
+        [
+          {
+            "node": "Function → Error Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Function → Error Handler": {
+      "main": [
+        [
+          {
+            "node": "Postgres → Mark Errored",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF → Has Metadata?": {
+      "main": [
+        [
+          {
+            "node": "Merge → After Migration Check",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Function → Calculate Metadata",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Function → Calculate Metadata": {
+      "main": [
+        [
+          {
+            "node": "Postgres → Insert Record to Processed Table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres → Insert Record to Processed Table": {
+      "main": [
+        [
+          {
+            "node": "Merge → After Migration Check",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Claude AI Extraction": {
+      "main": [
+        [
+          {
+            "node": "Function → Parse Claude Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Postgres → Check if Already Processed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "5eea2f23-312f-46c1-a102-9d5896b4c7f0",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "8bbd75db5d93ed253da161a3f9a43848c8f523ad03d972422905e3095636f77f"
+  },
+  "id": "ir0rGtxRMvxsFWkw",
+  "tags": []
+}

@@ -1,0 +1,110 @@
+{
+  "schema_version": "1.0",
+  "description": "Complete attribute schema that Claude LLM can extract from telecom reviews",
+  "categories": {
+    "metadata": {
+      "review_id": "string",
+      "source_platform": "enum",
+      "posted_date": "date",
+      "review_language": "string",
+      "character_count": "integer",
+      "word_count": "integer",
+      "is_verified_purchase": "boolean"
+    },
+    "reviewer_profile": {
+      "reviewer_type": "enum[residential, business, senior, student]",
+      "location": {
+        "city": "string",
+        "state": "string",
+        "region": "enum",
+        "area_type": "enum[urban, suburban, rural]"
+      },
+      "customer_tenure": {
+        "duration_months": "integer",
+        "tenure_category": "enum[new_customer, established, long_term, very_long_term]"
+      },
+      "tech_savviness": "enum[low, medium, high, expert]",
+      "use_cases": "array[string]",
+      "criticality_level": "enum[casual, moderate, important, mission_critical]"
+    },
+    "sentiment_analysis": {
+      "overall_sentiment": "enum[very_positive, positive, neutral, negative, very_negative, mixed]",
+      "sentiment_score": "float[-1.0 to 1.0]",
+      "sentiment_intensity": "enum[mild, moderate, strong, extreme]",
+      "emotional_tone": "array[string]",
+      "urgency_level": "enum[low, medium, high, critical]",
+      "aspect_based_sentiment": {
+        "network_performance": "object",
+        "pricing_billing": "object",
+        "customer_service": "object",
+        "installation_setup": "object",
+        "equipment_hardware": "object"
+      }
+    },
+    "classification": {
+      "primary_category": "string",
+      "all_categories": "array[string]",
+      "subcategories": "object",
+      "main_categories": [
+        "Network Performance",
+        "Pricing & Billing",
+        "Customer Service",
+        "Installation & Setup",
+        "Equipment & Hardware",
+        "Contracts & Terms",
+        "Overall Satisfaction",
+        "Coverage & Availability",
+        "Competitive Comparison"
+      ]
+    },
+    "technical_issues": {
+      "problems_identified": "array[object]",
+      "severity": "enum[low, medium, high, critical]",
+      "frequency": "enum[one_time, rare, occasional, frequent, constant]",
+      "resolution_status": "enum[unresolved, partially_resolved, resolved, worsening]"
+    },
+    "metrics_extracted": {
+      "network_metrics": {
+        "speed_download": "object",
+        "speed_upload": "object",
+        "latency_ping": "object",
+        "packet_loss": "object"
+      },
+      "outage_metrics": {
+        "outage_count": "integer",
+        "frequency": "string",
+        "duration": "string"
+      },
+      "pricing_metrics": {
+        "advertised_price": "float",
+        "actual_bill_amount": "float",
+        "price_discrepancy": "float"
+      },
+      "support_metrics": {
+        "contact_attempts": "integer",
+        "average_wait_time_minutes": "integer",
+        "resolution_rate": "float"
+      }
+    },
+    "churn_analysis": {
+      "churn_risk": "enum[low, medium, high, critical]",
+      "churn_probability_score": "float[0-1]",
+      "churn_indicators": "array[string]",
+      "switching_intent": "object",
+      "retention_opportunity": "boolean"
+    },
+    "competitive_data": {
+      "competitors_mentioned": "array[string]",
+      "previous_provider": "string",
+      "satisfaction_vs_previous": "enum"
+    },
+    "business_impact": {
+      "nps_indicator": "enum[detractor, passive, promoter]",
+      "would_recommend": "boolean",
+      "reputation_risk": "enum[low, medium, high, critical]",
+      "resolution_urgency": "enum[low, medium, high, critical]"
+    }
+  }
+}
+
+
