@@ -1,0 +1,41 @@
+{
+  "parameters": {
+    "method": "POST",
+    "url": "https://dbc-4a93b454-f17b.cloud.databricks.com/serving-endpoints/databricks-gte-large-en/invocations",
+    "authentication": "genericCredentialType",
+    "genericAuthType": "httpHeaderAuth",
+    "sendHeaders": true,
+    "headerParameters": {
+      "parameters": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ]
+    },
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "={\n  \"input\": \"{{ $json.review_text }}\"\n}",
+    "options": {
+      "timeout": 30000,
+      "response": {
+        "response": {
+          "responseFormat": "json"
+        }
+      }
+    }
+  },
+  "id": "databricks-gte-embeddings",
+  "name": "HTTP → Databricks GTE Embeddings",
+  "type": "n8n-nodes-base.httpRequest",
+  "typeVersion": 4.2,
+  "position": [1200, 300],
+  "credentials": {
+    "httpHeaderAuth": {
+      "id": "databricks-token",
+      "name": "Databricks GTE Embeddings"
+    }
+  },
+  "notes": "Generates 1024-dim embeddings using Databricks GTE-large-en model"
+}
+
