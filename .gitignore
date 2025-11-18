@@ -29,6 +29,12 @@ yarn-error.log*
 .env
 env.example
 
+# credentials and authentication
+**/AUTHENTICATION_INFO.txt
+**/credential_setup*.txt
+**/*credentials*.txt
+**/*secrets*.txt
+
 # vercel
 .vercel
 
