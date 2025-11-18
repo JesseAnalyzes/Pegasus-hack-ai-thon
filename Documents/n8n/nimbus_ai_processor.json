@@ -7,7 +7,7 @@
           "interval": [
             {
               "field": "minutes",
-              "minutesInterval": 120
+              "minutesInterval": 120000
             }
           ]
         }
@@ -17,8 +17,8 @@
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
       "position": [
-        -1536,
-        208
+        -1568,
+        96
       ],
       "notes": "Configure interval in node settings. Set 'Skip if already running' in workflow settings."
     },
@@ -59,15 +59,17 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.4,
       "position": [
-        -1232,
+        -1184,
         208
       ],
+      "alwaysOutputData": true,
       "credentials": {
         "postgres": {
           "id": "8VvvFZVfssWZe1JJ",
           "name": "Postgres account"
         }
-      }
+      },
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
@@ -98,8 +100,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.1,
       "position": [
-        -1056,
-        208
+        -896,
+        192
       ]
     },
     {
@@ -115,8 +117,8 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.4,
       "position": [
-        -608,
-        144
+        -448,
+        192
       ],
       "alwaysOutputData": true,
       "credentials": {
@@ -124,7 +126,8 @@
           "id": "8VvvFZVfssWZe1JJ",
           "name": "Postgres account"
         }
-      }
+      },
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
@@ -136,8 +139,8 @@
       "type": "n8n-nodes-base.merge",
       "typeVersion": 2.1,
       "position": [
-        464,
-        96
+        448,
+        176
       ],
       "alwaysOutputData": true
     },
@@ -150,10 +153,11 @@
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
       "position": [
-        800,
-        96
+        640,
+        176
       ],
-      "alwaysOutputData": true
+      "alwaysOutputData": true,
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
@@ -164,10 +168,11 @@
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
       "position": [
-        864,
-        -480
+        1104,
+        144
       ],
-      "alwaysOutputData": true
+      "alwaysOutputData": true,
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
@@ -182,8 +187,8 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.4,
       "position": [
-        1056,
-        -480
+        1328,
+        128
       ],
       "alwaysOutputData": true,
       "credentials": {
@@ -191,7 +196,8 @@
           "id": "8VvvFZVfssWZe1JJ",
           "name": "Postgres account"
         }
-      }
+      },
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
@@ -202,10 +208,11 @@
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
       "position": [
-        1264,
-        -480
+        672,
+        480
       ],
-      "alwaysOutputData": true
+      "alwaysOutputData": true,
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
@@ -229,8 +236,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1472,
-        -480
+        896,
+        464
       ],
       "alwaysOutputData": true,
       "credentials": {
@@ -239,20 +246,23 @@
           "name": "Bearer Auth account"
         }
       },
+      "onError": "continueErrorOutput",
       "notes": "Call GTE embedding API. Update URL and auth based on your GTE service."
     },
     {
       "parameters": {
-        "functionCode": "// Parse Databricks GTE Embedding Response (OpenAI-compatible format)\nconst embeddingResponse = $json;\n//const reviewData = $input.first().json;\nconst reviewData = $('Loop Over Items').first().json;\n\nconsole.log('Processing embedding for review:', reviewData.review_id);\n\nlet embedding = null;\nlet embeddingString = null;\n\ntry {\n  // OpenAI-compatible format: { \"data\": [{ \"embedding\": [...] }] }\n  if (embeddingResponse.data && Array.isArray(embeddingResponse.data)) {\n    embedding = embeddingResponse.data[0].embedding;\n    console.log('✓ Found embedding in OpenAI format (data array)');\n  }\n  // Databricks format: { \"predictions\": [[...]] }\n  else if (embeddingResponse.predictions && Array.isArray(embeddingResponse.predictions)) {\n    embedding = embeddingResponse.predictions[0];\n    console.log('✓ Found embedding in Databricks format (predictions)');\n  }\n  // Direct array format\n  else if (Array.isArray(embeddingResponse)) {\n    embedding = embeddingResponse[0];\n    console.log('✓ Found embedding in direct array');\n  }\n  // Object with embedding key\n  else if (embeddingResponse.embedding) {\n    embedding = embeddingResponse.embedding;\n    console.log('✓ Found embedding in object');\n  }\n  else {\n    throw new Error('Unexpected response format: ' + JSON.stringify(embeddingResponse).substring(0, 200));\n  }\n  \n  // Validate embedding\n  if (!Array.isArray(embedding) || embedding.length === 0) {\n    throw new Error('Embedding is not a valid array. Got: ' + typeof embedding);\n  }\n  \n  // Convert to PostgreSQL vector format: '[0.1,0.2,0.3,...]'\n  embeddingString = '[' + embedding.join(',') + ']';\n  \n  console.log('✓ Embedding dimension:', embedding.length);\n  console.log('✓ First 5 values:', embedding.slice(0, 5));\n  console.log('✓ Model:', embeddingResponse.model);\n  \n} catch (error) {\n  console.error('❌ Failed to parse embedding:', error.message);\n  console.error('Response keys:', Object.keys(embeddingResponse));\n  throw new Error('Embedding parse error: ' + error.message);\n}\n\n// Return complete data with embedding\nreturn [{\n  json: {\n    // All previous data\n    ...reviewData,\n    \n    // Add embedding data\n    gte_embedding: embeddingString,\n    embedding_array: embedding,\n    embedding_dimension: embedding.length,\n    embedding_model: embeddingResponse.model || 'databricks-gte-large-en',\n    embedding_created_at: new Date().toISOString(),\n    \n    // Token usage (if available)\n    embedding_tokens: embeddingResponse.usage?.total_tokens || null,\n    \n    // Update processing status\n    processing_status: 'completed'\n  }\n}];\n\n"
+        "functionCode": "// Parse Databricks GTE Embedding Response with Null Handling\n// Handles cases where input is null, undefined, or malformed\n\n// ============================================================================\n// PART 1: Validate Inputs\n// ============================================================================\n\n// Get embedding response\nconst embeddingResponse = $json;\n\n// Validate embedding response exists\nif (!embeddingResponse || typeof embeddingResponse !== 'object') {\n  console.error('❌ Invalid embedding response:', embeddingResponse);\n  throw new Error('GTE API returned null or invalid response');\n}\n\n// Get review data from loop\nlet reviewData = null;\ntry {\n  reviewData = $('Loop Over Items').first().json;\n} catch (e) {\n  console.error('❌ Could not retrieve review data from loop:', e.message);\n  throw new Error('Review data not available in loop context');\n}\n\n// Validate review data\nif (!reviewData || !reviewData.id) {\n  console.error('❌ Review data is null or missing ID:', reviewData);\n  throw new Error('Invalid review data');\n}\n\nconsole.log('Processing embedding for review:', reviewData.id);\n\n// ============================================================================\n// PART 2: Extract Embedding with Null Checks\n// ============================================================================\n\nlet embedding = null;\nlet embeddingString = null;\n\ntry {\n  // OpenAI-compatible format: { \"data\": [{ \"embedding\": [...] }] }\n  if (embeddingResponse.data && Array.isArray(embeddingResponse.data) && embeddingResponse.data.length > 0) {\n    const firstData = embeddingResponse.data[0];\n    if (firstData && firstData.embedding) {\n      embedding = firstData.embedding;\n      console.log('✓ Found embedding in OpenAI format (data array)');\n    }\n  }\n  \n  // Databricks format: { \"predictions\": [[...]] }\n  if (!embedding && embeddingResponse.predictions && Array.isArray(embeddingResponse.predictions) && embeddingResponse.predictions.length > 0) {\n    const firstPrediction = embeddingResponse.predictions[0];\n    if (firstPrediction) {\n      embedding = firstPrediction;\n      console.log('✓ Found embedding in Databricks format (predictions)');\n    }\n  }\n  \n  // Direct array format\n  if (!embedding && Array.isArray(embeddingResponse) && embeddingResponse.length > 0) {\n    embedding = embeddingResponse[0];\n    console.log('✓ Found embedding in direct array');\n  }\n  \n  // Object with embedding key\n  if (!embedding && embeddingResponse.embedding) {\n    embedding = embeddingResponse.embedding;\n    console.log('✓ Found embedding in object');\n  }\n  \n  // Check if we found an embedding\n  if (!embedding) {\n    console.error('❌ No embedding found in response');\n    console.error('Response structure:', JSON.stringify(embeddingResponse).substring(0, 300));\n    throw new Error('Could not extract embedding from response. Response keys: ' + Object.keys(embeddingResponse).join(', '));\n  }\n  \n  // Validate embedding is an array\n  if (!Array.isArray(embedding)) {\n    console.error('❌ Embedding is not an array. Type:', typeof embedding);\n    throw new Error('Embedding is not a valid array. Got: ' + typeof embedding);\n  }\n  \n  // Validate embedding has values\n  if (embedding.length === 0) {\n    console.error('❌ Embedding array is empty');\n    throw new Error('Embedding array is empty');\n  }\n  \n  // Validate embedding values are numbers\n  const hasInvalidValues = embedding.some(val => typeof val !== 'number' || isNaN(val));\n  if (hasInvalidValues) {\n    console.error('❌ Embedding contains non-numeric values');\n    throw new Error('Embedding contains invalid (non-numeric) values');\n  }\n  \n  // Convert to PostgreSQL vector format: '[0.1,0.2,0.3,...]'\n  embeddingString = '[' + embedding.join(',') + ']';\n  \n  console.log('✓ Embedding dimension:', embedding.length);\n  console.log('✓ First 5 values:', embedding.slice(0, 5));\n  console.log('✓ Last 5 values:', embedding.slice(-5));\n  \n  // Check for expected dimensions (GTE-large should be 1024)\n  if (embedding.length !== 1024 && embedding.length !== 768) {\n    console.warn('⚠️ Unexpected embedding dimension:', embedding.length);\n    console.warn('Expected: 1024 (GTE-large) or 768 (GTE-base)');\n  }\n  \n} catch (error) {\n  console.error('❌ Failed to parse embedding:', error.message);\n  console.error('Response type:', typeof embeddingResponse);\n  console.error('Response keys:', embeddingResponse ? Object.keys(embeddingResponse).join(', ') : 'null');\n  \n  // Re-throw with more context\n  throw new Error('Embedding parse error: ' + error.message);\n}\n\n// ============================================================================\n// PART 3: Build and Return Output\n// ============================================================================\n\n// Get model name safely\nconst modelName = embeddingResponse.model || \n                 embeddingResponse.metadata?.model || \n                 'databricks-gte-large-en';\n\nconsole.log('✓ Model:', modelName);\n\n// Return complete data with embedding\nreturn [{\n  json: {\n    // All previous data (with null safety)\n    ...reviewData,\n    \n    // Add embedding data\n    gte_embedding: embeddingString,\n    embedding_array: embedding,\n    embedding_dimension: embedding.length,\n    embedding_model: modelName,\n    embedding_created_at: new Date().toISOString(),\n    \n    // Token usage (if available)\n    embedding_tokens: embeddingResponse.usage?.total_tokens || \n                     embeddingResponse.usage?.prompt_tokens || \n                     null,\n    \n    // Update processing status\n    processing_status: 'embedding_completed'\n  }\n}];"
       },
       "id": "e8ec9662-e231-495e-b68a-b494d1182106",
       "name": "Function → Parse GTE Embedding",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
       "position": [
-        1680,
-        -480
-      ]
+        1136,
+        448
+      ],
+      "alwaysOutputData": true,
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
@@ -267,16 +277,17 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.4,
       "position": [
-        1936,
-        -480
+        1344,
+        432
       ],
       "alwaysOutputData": true,
       "credentials": {
         "postgres": {
-          "id": "HXJ5ic1ZBgUDE8cv",
-          "name": "Postgres account 2"
+          "id": "8VvvFZVfssWZe1JJ",
+          "name": "Postgres account"
         }
-      }
+      },
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
@@ -291,50 +302,54 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.4,
       "position": [
-        2224,
-        -480
+        1648,
+        416
       ],
       "credentials": {
         "postgres": {
-          "id": "HXJ5ic1ZBgUDE8cv",
-          "name": "Postgres account 2"
+          "id": "8VvvFZVfssWZe1JJ",
+          "name": "Postgres account"
         }
-      }
+      },
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
-        "functionCode": "// Error handler - mark as errored\nconst error = $input.first().error || {};\nconst reviewData = $('Function → Prepare Claude Request').first()?.json?.review_data ||\n                    $('Function → Prepare GTE Embedding').first()?.json?.review_data ||\n                    { id: 'unknown' };\n\nreturn [{\n  json: {\n    review_id: reviewData.id || reviewData.review_id,\n    error_message: error.message || 'Unknown error',\n    error_details: JSON.stringify(error),\n    processing_status: 'errored'\n  }\n}];"
+        "functionCode": "// Proper Error Handler - Only executes on actual errors\n\n// Get the error details from n8n's error object\nconst inputData = $input.first();\nconst error = inputData.error || {};\nconst json = inputData.json || {};\n\n// Get review data from the loop (always available during loop execution)\nlet reviewId = 'unknown';\nlet reviewData = null;\n\ntry {\n  // Try to get review data from Split In Batches\n  reviewData = $('Loop Over Items').first().json;\n  reviewId = reviewData?.id || reviewData?.review_id || 'unknown';\n} catch (e) {\n  console.warn('Could not retrieve review data from loop:', e.message);\n}\n\n// Extract error information\nconst errorMessage = error.message || json.message || 'Unknown error occurred';\nconst errorNode = error.node?.name || 'unknown node';\nconst errorType = error.type || 'UnknownError';\n\n// Build detailed error log\nconst errorDetails = {\n  node: errorNode,\n  type: errorType,\n  message: errorMessage,\n  timestamp: new Date().toISOString(),\n  review_id: reviewId\n};\n\n// Log to console for debugging\nconsole.error('❌ Workflow Error:', errorDetails);\n\n// Return formatted error for database logging\nreturn [{\n  json: {\n    review_id: reviewId,\n    error_message: `[${errorNode}] ${errorMessage}`,\n    error_details: JSON.stringify(errorDetails),\n    error_node: errorNode,\n    error_type: errorType,\n    processing_status: 'errored',\n    error_timestamp: new Date().toISOString()\n  }\n}];"
       },
       "id": "1111cdee-b76a-4d5b-83cc-ce7543d52150",
       "name": "Function → Error Handler",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
       "position": [
-        1536,
-        96
+        -544,
+        960
       ],
       "onError": "continueErrorOutput"
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "UPDATE frontier_reviews_processed\nSET\n  processing_status = 'errored',\n  error_message = :error_message,\n  processing_attempts = COALESCE(processing_attempts, 0) + 1,\n  last_processed_at = NOW(),\n  updated_at = NOW()\nWHERE review_id = :review_id;\n\n-- Also try to insert if it doesn't exist (in case error happened before insert)\nINSERT INTO frontier_reviews_processed (\n  review_id, platform, review_date, rating, reviewer_name, location,\n  review_text, processing_status, error_message, processing_attempts,\n  last_processed_at\n)\nSELECT\n  id, platform, review_date, rating, reviewer_name, location,\n  review_text, 'errored', :error_message, 1, NOW()\nFROM frontier_reviews\nWHERE id = :review_id\nON CONFLICT (review_id) DO NOTHING;",
-        "options": {}
+        "query": "-- Update existing record with error info\nUPDATE team_pegasus.frontier_reviews_processed\nSET\n  processing_status = 'errored',\n  error_message = $1,\n  processing_attempts = COALESCE(processing_attempts, 0) + 1,\n  last_processed_at = NOW(),\n  updated_at = NOW()\nWHERE review_id = $2;\n\n-- Insert if record doesn't exist (error happened before initial insert)\nINSERT INTO team_pegasus.frontier_reviews_processed (\n  review_id, platform, review_date, rating, reviewer_name, location,\n  review_text, processing_status, error_message, processing_attempts,\n  last_processed_at, created_at\n)\nSELECT\n  id, platform, review_date, rating, reviewer_name, location,\n  review_text, 'errored', $1, 1, NOW(), NOW()\nFROM team_pegasus.frontier_reviews\nWHERE id = $2\n  AND NOT EXISTS (\n    SELECT 1 FROM team_pegasus.frontier_reviews_processed \n    WHERE review_id = $2\n  );",
+        "options": {
+          "queryReplacement": "={{ $json.error_message }},{{ $json.review_id }}"
+        }
       },
       "id": "94dcba4d-13c6-4fce-8347-f9e379712cc6",
       "name": "Postgres → Mark Errored",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.4,
       "position": [
-        1824,
-        112
+        -288,
+        944
       ],
       "credentials": {
         "postgres": {
-          "id": "HXJ5ic1ZBgUDE8cv",
-          "name": "Postgres account 2"
+          "id": "8VvvFZVfssWZe1JJ",
+          "name": "Postgres account"
         }
-      }
+      },
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {},
@@ -343,8 +358,8 @@
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
       "position": [
-        -864,
-        336
+        -880,
+        -112
       ]
     },
     {
@@ -385,24 +400,26 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.1,
       "position": [
-        -336,
-        144
+        -176,
+        176
       ],
       "alwaysOutputData": true,
       "notes": "If record not in processed table, migrate it first"
     },
     {
       "parameters": {
-        "functionCode": "// Calculate metadata for migration (same logic as Python script)\n//const review = $('Split In Batches (1 at a time)').first().json;\n\nconst review = $('Loop Over Items').first().json;\n\nconsole.log(review)\n\n// Calculate geographic metadata from location\nconst location = review.location || '';\nlet city = null, state = null, region = null, area_type = null;\n\nif (location.includes(',')) {\n  const parts = location.split(',').map(s => s.trim());\n  city = parts[0] || null;\n  state = parts[1] || null;\n  \n  // Determine region from state\n  if (state === 'CA') region = 'West Coast';\n  else if (state === 'TX') region = 'South';\n  else region = 'Other';\n} else if (location.startsWith('Rural')) {\n  city = location;\n  area_type = 'rural';\n}\n\n// Determine area type\nif (!area_type) {\n  const urbanCities = ['Los Angeles, CA', 'San Diego, CA', 'San Jose, CA', 'San Francisco, CA', 'Fresno, CA', 'Sacramento, CA', 'Long Beach, CA', 'Oakland, CA', 'Houston, TX', 'Dallas, TX', 'San Antonio, TX', 'Austin, TX', 'Fort Worth, TX', 'El Paso, TX', 'Arlington, TX', 'Corpus Christi, TX'];\n  if (urbanCities.includes(location)) {\n    area_type = 'urban';\n  } else {\n    area_type = 'suburban';\n  }\n}\n\n// Calculate temporal metadata from review_date\nconst reviewDate = new Date(review.review_date);\nconst year = reviewDate.getFullYear();\nconst month = reviewDate.getMonth() + 1;\nconst quarter = 'Q' + Math.ceil(month / 3) + ' ' + year;\n\n// Calculate ISO week number\nfunction getWeekNumber(date) {\n  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));\n  const dayNum = d.getUTCDay() || 7;\n  d.setUTCDate(d.getUTCDate() + 4 - dayNum);\n  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));\n  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);\n}\nconst weekOfYear = getWeekNumber(reviewDate);\nconst daysAgo = Math.floor((new Date() - reviewDate) / (1000 * 60 * 60 * 24));\n\nreturn [{\n  json: {\n    review_id: review.review_id || review.id,\n    platform: review.platform,\n    review_date: review.review_date,\n    rating: review.rating,\n    reviewer_name: review.reviewer_name,\n    location: review.location,\n    review_text: review.review_text,\n    helpful_count: review.helpful_count || 0,\n    review_url: review.review_url,\n    title: review.title,\n    verified_reviewer: review.verified_reviewer,\n    verified_customer: review.verified_customer,\n    local_guide: review.local_guide,\n    // Geographic metadata\n    city: city,\n    state: state,\n    region: region,\n    area_type: area_type,\n    // Temporal metadata\n    date_parsed: review.review_date,\n    year: year,\n    month: month,\n    quarter: quarter,\n    week_of_year: weekOfYear,\n    days_ago: daysAgo,\n    // Processing status\n    processing_status: 'pending',\n    // Empty AI attributes (will be populated by Claude)\n    ai_attributes: {}\n  }\n}];"
+        "functionCode": "// Calculate metadata for migration (same logic as Python script)\n\nconst review = $('Loop Over Items').first().json;\n\nconsole.log(review)\n\n// Calculate geographic metadata from location\nconst location = review.location || '';\nlet city = null, state = null, region = null, area_type = null;\n\nif (location.includes(',')) {\n  const parts = location.split(',').map(s => s.trim());\n  city = parts[0] || null;\n  state = parts[1] || null;\n  \n  // Determine region from state\n  if (state === 'CA') region = 'West Coast';\n  else if (state === 'TX') region = 'South';\n  else region = 'Other';\n} else if (location.startsWith('Rural')) {\n  city = location;\n  area_type = 'rural';\n}\n\n// Determine area type\nif (!area_type) {\n  const urbanCities = ['Los Angeles, CA', 'San Diego, CA', 'San Jose, CA', 'San Francisco, CA', 'Fresno, CA', 'Sacramento, CA', 'Long Beach, CA', 'Oakland, CA', 'Houston, TX', 'Dallas, TX', 'San Antonio, TX', 'Austin, TX', 'Fort Worth, TX', 'El Paso, TX', 'Arlington, TX', 'Corpus Christi, TX'];\n  if (urbanCities.includes(location)) {\n    area_type = 'urban';\n  } else {\n    area_type = 'suburban';\n  }\n}\n\n// Calculate temporal metadata from review_date\nconst reviewDate = new Date(review.review_date);\nconst year = reviewDate.getFullYear();\nconst month = reviewDate.getMonth() + 1;\nconst quarter = 'Q' + Math.ceil(month / 3) + ' ' + year;\n\n// Calculate ISO week number\nfunction getWeekNumber(date) {\n  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));\n  const dayNum = d.getUTCDay() || 7;\n  d.setUTCDate(d.getUTCDate() + 4 - dayNum);\n  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));\n  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);\n}\nconst weekOfYear = getWeekNumber(reviewDate);\nconst daysAgo = Math.floor((new Date() - reviewDate) / (1000 * 60 * 60 * 24));\n\nreturn [{\n  json: {\n    review_id: review.review_id || review.id,\n    platform: review.platform,\n    review_date: review.review_date,\n    rating: review.rating,\n    reviewer_name: review.reviewer_name,\n    location: review.location,\n    review_text: review.review_text,\n    helpful_count: review.helpful_count || 0,\n    review_url: review.review_url,\n    title: review.title,\n    verified_reviewer: review.verified_reviewer,\n    verified_customer: review.verified_customer,\n    local_guide: review.local_guide,\n    // Geographic metadata\n    city: city,\n    state: state,\n    region: region,\n    area_type: area_type,\n    // Temporal metadata\n    date_parsed: review.review_date,\n    year: year,\n    month: month,\n    quarter: quarter,\n    week_of_year: weekOfYear,\n    days_ago: daysAgo,\n    // Processing status\n    processing_status: 'pending',\n    // Empty AI attributes (will be populated by Claude)\n    ai_attributes: {}\n  }\n}];"
       },
       "id": "cf29e1be-7a88-466a-8573-1be8391ba806",
       "name": "Function → Calculate Metadata",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
       "position": [
-        -32,
-        208
-      ]
+        0,
+        432
+      ],
+      "alwaysOutputData": true,
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
@@ -417,15 +434,16 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.4,
       "position": [
-        224,
-        208
+        272,
+        416
       ],
       "credentials": {
         "postgres": {
           "id": "8VvvFZVfssWZe1JJ",
           "name": "Postgres account"
         }
-      }
+      },
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
@@ -458,8 +476,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        656,
-        -480
+        864,
+        160
       ],
       "alwaysOutputData": true,
       "credentials": {
@@ -471,7 +489,23 @@
           "id": "Nkgn1ozqdDtVKFsC",
           "name": "Anthropic account"
         }
-      }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "path": "74ec6413-a383-4c81-a875-0c1a943724e0",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1568,
+        304
+      ],
+      "id": "506a7c13-0306-4cb1-bf96-3b72cd9ec82f",
+      "name": "Webhook",
+      "webhookId": "74ec6413-a383-4c81-a875-0c1a943724e0"
     },
     {
       "parameters": {
@@ -480,10 +514,10 @@
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
       "position": [
-        -848,
-        128
+        -656,
+        176
       ],
-      "id": "5d55b071-91c9-4697-8c44-77aa13f215dc",
+      "id": "57823ac1-d77e-4c10-90c3-27abdb454388",
       "name": "Loop Over Items"
     }
   ],
@@ -519,6 +553,13 @@
             "type": "main",
             "index": 0
           }
+        ],
+        [
+          {
+            "node": "Function → Error Handler",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
@@ -548,6 +589,13 @@
             "type": "main",
             "index": 0
           }
+        ],
+        [
+          {
+            "node": "Function → Error Handler",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
@@ -566,12 +614,14 @@
       "main": [
         [
           {
-            "node": "Function → Error Handler",
+            "node": "Claude AI Extraction",
             "type": "main",
             "index": 0
-          },
+          }
+        ],
+        [
           {
-            "node": "Claude AI Extraction",
+            "node": "Function → Error Handler",
             "type": "main",
             "index": 0
           }
@@ -585,7 +635,9 @@
             "node": "Postgres → Insert/Update (Claude Processed)",
             "type": "main",
             "index": 0
-          },
+          }
+        ],
+        [
           {
             "node": "Function → Error Handler",
             "type": "main",
@@ -601,7 +653,9 @@
             "node": "Function → Prepare GTE Embedding",
             "type": "main",
             "index": 0
-          },
+          }
+        ],
+        [
           {
             "node": "Function → Error Handler",
             "type": "main",
@@ -617,7 +671,9 @@
             "node": "HTTP → GTE Embedding API",
             "type": "main",
             "index": 0
-          },
+          }
+        ],
+        [
           {
             "node": "Function → Error Handler",
             "type": "main",
@@ -633,7 +689,9 @@
             "node": "Function → Parse GTE Embedding",
             "type": "main",
             "index": 0
-          },
+          }
+        ],
+        [
           {
             "node": "Function → Error Handler",
             "type": "main",
@@ -649,7 +707,9 @@
             "node": "Postgres → Update Embedding",
             "type": "main",
             "index": 0
-          },
+          }
+        ],
+        [
           {
             "node": "Function → Error Handler",
             "type": "main",
@@ -665,7 +725,9 @@
             "node": "Postgres → Mark Completed",
             "type": "main",
             "index": 0
-          },
+          }
+        ],
+        [
           {
             "node": "Function → Error Handler",
             "type": "main",
@@ -676,6 +738,13 @@
     },
     "Postgres → Mark Completed": {
       "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ],
         [
           {
             "node": "Function → Error Handler",
@@ -722,6 +791,13 @@
             "type": "main",
             "index": 0
           }
+        ],
+        [
+          {
+            "node": "Function → Error Handler",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
@@ -733,6 +809,13 @@
             "type": "main",
             "index": 1
           }
+        ],
+        [
+          {
+            "node": "Function → Error Handler",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
@@ -741,6 +824,24 @@
         [
           {
             "node": "Function → Parse Claude Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Function → Error Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Set → Parameters",
             "type": "main",
             "index": 0
           }
@@ -764,7 +865,7 @@
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "5eea2f23-312f-46c1-a102-9d5896b4c7f0",
+  "versionId": "3c109659-8499-43ed-ad1a-cd517dba10dc",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "8bbd75db5d93ed253da161a3f9a43848c8f523ad03d972422905e3095636f77f"
