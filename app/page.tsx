@@ -112,7 +112,7 @@ function DashboardContent() {
           <img 
             src="/nimbus_logo_white_transparent.png" 
             alt="Nimbus Logo" 
-            className="h-16 w-auto object-contain"
+            className="h-20 w-auto object-contain"
           />
         </div>
         <div>
