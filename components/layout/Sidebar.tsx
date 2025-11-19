@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import Image from 'next/image';
 import { LayoutDashboard, FileText, MessageSquare } from 'lucide-react';
 
 const navigation = [
@@ -16,11 +15,7 @@ export function Sidebar() {
 
   return (
     <div className="w-64 bg-dark-sidebar border-r border-dark-border flex flex-col">
-      <div className="p-6 border-b border-dark-border">
-        <h2 className="text-xl font-bold text-gray-100">Nimbus</h2>
-        <p className="text-sm text-gray-400 font-medium mt-1">AI Sentiment Intelligence</p>
-      </div>
-      <nav className="flex-1 p-4 space-y-2">
+      <nav className="flex-1 p-4 space-y-2 pt-6">
         {navigation.map((item) => {
           const Icon = item.icon;
           const isActive = pathname === item.href;

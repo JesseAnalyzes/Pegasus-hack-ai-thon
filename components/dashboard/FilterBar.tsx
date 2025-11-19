@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/Card';
+import { MultiSelect } from '@/components/ui/MultiSelect';
 import { X } from 'lucide-react';
 
 export function FilterBar() {
@@ -53,10 +54,9 @@ export function FilterBar() {
   );
 
   return (
-    <Card className="mb-6">
-      <CardContent className="p-4">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-semibold text-gray-100">Filters</h3>
+    <Card className="mb-6 overflow-visible relative z-50">
+      <CardContent className="p-4 overflow-visible">
+        <div className="flex items-center justify-end mb-4">
           {hasActiveFilters && (
             <button
               onClick={clearFilters}
@@ -67,68 +67,54 @@ export function FilterBar() {
             </button>
           )}
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 overflow-visible">
           <div>
-            <label className="block text-xs font-medium text-gray-400 mb-1">
+            <label className="block text-xs font-medium text-gray-600 dark:text-white mb-1">
               Date From
             </label>
             <input
               type="date"
               value={filters.dateFrom}
               onChange={(e) => updateFilter('dateFrom', e.target.value)}
-              className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded-md text-sm text-gray-300 focus:border-accent-blue focus:ring-1 focus:ring-accent-blue"
+              className="w-full px-3 py-2 bg-white dark:bg-dark-bg border border-gray-300 dark:border-dark-border rounded-md text-sm text-gray-900 dark:text-gray-300 focus:border-accent-blue focus:ring-1 focus:ring-accent-blue [color-scheme:light] dark:[color-scheme:dark]"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-400 mb-1">
+            <label className="block text-xs font-medium text-gray-600 dark:text-white mb-1">
               Date To
             </label>
             <input
               type="date"
               value={filters.dateTo}
               onChange={(e) => updateFilter('dateTo', e.target.value)}
-              className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded-md text-sm text-gray-300 focus:border-accent-blue focus:ring-1 focus:ring-accent-blue"
+              className="w-full px-3 py-2 bg-white dark:bg-dark-bg border border-gray-300 dark:border-dark-border rounded-md text-sm text-gray-900 dark:text-gray-300 focus:border-accent-blue focus:ring-1 focus:ring-accent-blue [color-scheme:light] dark:[color-scheme:dark]"
             />
           </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-400 mb-1">
-              Churn Risk
-            </label>
-            <select
-              multiple
-              value={filters.churnRisk}
-              onChange={(e) => {
-                const values = Array.from(e.target.selectedOptions, (opt) => opt.value);
-                updateFilter('churnRisk', values);
-              }}
-              className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded-md text-sm text-gray-300 focus:border-accent-blue focus:ring-1 focus:ring-accent-blue"
-            >
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-              <option value="critical">Critical</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-400 mb-1">
-              Sentiment
-            </label>
-            <select
-              multiple
-              value={filters.overallSentiment}
-              onChange={(e) => {
-                const values = Array.from(e.target.selectedOptions, (opt) => opt.value);
-                updateFilter('overallSentiment', values);
-              }}
-              className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded-md text-sm text-gray-300 focus:border-accent-blue focus:ring-1 focus:ring-accent-blue"
-            >
-              <option value="very_negative">Very Negative</option>
-              <option value="negative">Negative</option>
-              <option value="neutral">Neutral</option>
-              <option value="positive">Positive</option>
-              <option value="very_positive">Very Positive</option>
-            </select>
-          </div>
+          <MultiSelect
+            label="Churn Risk"
+            options={[
+              { value: 'low', label: 'Low' },
+              { value: 'medium', label: 'Medium' },
+              { value: 'high', label: 'High' },
+              { value: 'critical', label: 'Critical' },
+            ]}
+            value={filters.churnRisk}
+            onChange={(value) => updateFilter('churnRisk', value)}
+            placeholder="Select risk levels..."
+          />
+          <MultiSelect
+            label="Sentiment"
+            options={[
+              { value: 'very_negative', label: 'Very Negative' },
+              { value: 'negative', label: 'Negative' },
+              { value: 'neutral', label: 'Neutral' },
+              { value: 'positive', label: 'Positive' },
+              { value: 'very_positive', label: 'Very Positive' },
+            ]}
+            value={filters.overallSentiment}
+            onChange={(value) => updateFilter('overallSentiment', value)}
+            placeholder="Select sentiments..."
+          />
         </div>
       </CardContent>
     </Card>

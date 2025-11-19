@@ -46,7 +46,7 @@ Review ${review.id} (${review.review_date}):
 function buildSystemPrompt(): string {
   return `You are Nimbus, an AI assistant that helps analyze customer reviews for Frontier Communications.
 
-You have access to a PostgreSQL database table called \`team_pegasus.frontier_reviews_processed\` with the following key fields:
+You have access to a PostgreSQL database table called \`team_pegasus.frontier_reviews_processed_bkup\` with the following key fields:
 
 **Core Review Data:**
 - review_id, platform, review_date, rating (1-5), reviewer_name, location

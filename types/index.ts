@@ -81,6 +81,7 @@ export interface FrontierReviewProcessed {
   issue_frequency: string | null;
   resolution_status: ResolutionStatus | null;
   ai_attributes: Record<string, any> | null; // JSONB
+  review_summary: string | null; // Pre-generated 25-word summary
   gte_embedding: string | null; // Vector as string representation
   embedding_model: string | null;
   embedding_created_at: string | null;
@@ -147,6 +148,10 @@ export interface SummaryStats {
     indicator: NPSIndicator;
     count: number;
     percentage: number;
+  }[];
+  category_counts: {
+    category: string;
+    count: number;
   }[];
   high_churn_percentage: number;
 }

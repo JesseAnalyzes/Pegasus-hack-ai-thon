@@ -12,14 +12,17 @@ export default function ChatPage() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [sources, setSources] = useState<ChatResponse['sources']>([]);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const conversationEndRef = useRef<HTMLDivElement>(null);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const scrollToConversationEnd = () => {
+    // Scroll to the end of the conversation area, not the very bottom of the page
+    conversationEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   };
 
   useEffect(() => {
-    scrollToBottom();
+    if (messages.length > 0) {
+      scrollToConversationEnd();
+    }
   }, [messages]);
 
   const handleSend = async () => {
@@ -74,8 +77,8 @@ export default function ChatPage() {
   return (
     <div className="p-8 h-full flex flex-col">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">AI Chat</h1>
-        <p className="text-gray-600 mt-1">Ask questions about customer reviews</p>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">AI Chat</h1>
+        <p className="text-gray-600 dark:text-white mt-1">Ask questions about customer reviews</p>
       </div>
 
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -85,6 +88,31 @@ export default function ChatPage() {
             <CardHeader>
               <CardTitle>Conversation</CardTitle>
             </CardHeader>
+            <div className="p-4 border-b border-gray-200 dark:border-dark-border">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  placeholder="Ask a question about the reviews..."
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 dark:text-gray-900 bg-white dark:bg-white"
+                  disabled={loading}
+                />
+                <button
+                  onClick={handleSend}
+                  disabled={loading || !input.trim()}
+                  className="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {loading ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <Send className="w-5 h-5" />
+                  )}
+                  Send
+                </button>
+              </div>
+            </div>
             <CardContent className="flex-1 overflow-y-auto p-6">
               {messages.length === 0 ? (
                 <div className="text-center text-gray-500 py-12">
@@ -124,35 +152,10 @@ export default function ChatPage() {
                       </div>
                     </div>
                   )}
-                  <div ref={messagesEndRef} />
+                  <div ref={conversationEndRef} />
                 </div>
               )}
             </CardContent>
-            <div className="p-4 border-t border-gray-200">
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder="Ask a question about the reviews..."
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  disabled={loading}
-                />
-                <button
-                  onClick={handleSend}
-                  disabled={loading || !input.trim()}
-                  className="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                >
-                  {loading ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <Send className="w-5 h-5" />
-                  )}
-                  Send
-                </button>
-              </div>
-            </div>
           </Card>
         </div>
 

@@ -28,6 +28,9 @@ function buildFilterClause(
   // Schema prefix
   const schemaPrefix = 'team_pegasus.';
 
+  // Always filter out records with null overall_sentiment
+  conditions.push(`${schemaPrefix}frontier_reviews_processed.overall_sentiment IS NOT NULL`);
+
   if (filters.dateFrom) {
     conditions.push(`${schemaPrefix}frontier_reviews_processed.review_date >= $${paramIndex}`);
     params.push(filters.dateFrom);
@@ -245,7 +248,16 @@ export async function getSummaryStats(
       END
   `;
 
-  const [stats, sentiment, churn, platforms, regions, states, nps] = await Promise.all([
+  // Category counts
+  const categoryQuery = `
+    SELECT primary_category as category, COUNT(*) as count
+    FROM ${schemaPrefix}frontier_reviews_processed
+    ${appendCondition(whereClause, 'primary_category IS NOT NULL')}
+    GROUP BY primary_category
+    ORDER BY count DESC
+  `;
+
+  const [stats, sentiment, churn, platforms, regions, states, nps, categories] = await Promise.all([
     query(statsQuery, params),
     query(sentimentQuery, params),
     query(churnQuery, params),
@@ -253,6 +265,7 @@ export async function getSummaryStats(
     query(regionQuery, params),
     query(stateQuery, params),
     query(npsQuery, params),
+    query(categoryQuery, params),
   ]);
 
   const totalReviews = parseInt(stats.rows[0]?.total_reviews || '0', 10);
@@ -288,6 +301,10 @@ export async function getSummaryStats(
       indicator: r.indicator,
       count: parseInt(r.count, 10),
       percentage: parseFloat(r.percentage || '0'),
+    })),
+    category_counts: categories.rows.map((r: any) => ({
+      category: r.category,
+      count: parseInt(r.count, 10),
     })),
     high_churn_percentage: totalReviews > 0 ? (highChurnCount / totalReviews) * 100 : 0,
   };
