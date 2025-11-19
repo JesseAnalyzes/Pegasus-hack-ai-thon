@@ -20,6 +20,18 @@ CREATE TABLE frontier_reviews (
     verified_customer BOOLEAN,
     local_guide BOOLEAN,
     
+    -- Geographic and temporal metadata (for filtering and analysis)
+    city VARCHAR(100),
+    state VARCHAR(50),
+    region VARCHAR(50),
+    area_type VARCHAR(20),  -- urban, suburban, rural
+    date_parsed DATE,  -- ISO format date for consistent sorting
+    year INTEGER,
+    month INTEGER,
+    quarter VARCHAR(10),  -- e.g., "Q3 2024"
+    week_of_year INTEGER,
+    days_ago INTEGER,
+    
     -- Vector embeddings (pgvector)
     review_text_embedding VECTOR(1536),  -- For OpenAI ada-002 or similar (adjust dimension as needed)
     title_embedding VECTOR(1536),        -- For title embeddings (if title exists)
@@ -46,6 +58,13 @@ CREATE INDEX idx_reviews_rating ON frontier_reviews(rating);
 CREATE INDEX idx_reviews_date ON frontier_reviews(review_date DESC);
 CREATE INDEX idx_reviews_location ON frontier_reviews(location);
 CREATE INDEX idx_reviews_is_processed ON frontier_reviews(is_processed);
+
+-- Indexes for metadata fields (for filtering and analysis)
+CREATE INDEX idx_reviews_state ON frontier_reviews(state);
+CREATE INDEX idx_reviews_city ON frontier_reviews(city);
+CREATE INDEX idx_reviews_area_type ON frontier_reviews(area_type);
+CREATE INDEX idx_reviews_year_month ON frontier_reviews(year, month);
+CREATE INDEX idx_reviews_quarter ON frontier_reviews(quarter);
 
 -- Create GIN index for full-text search on review text
 CREATE INDEX idx_reviews_text_search ON frontier_reviews USING gin(to_tsvector('english', review_text));
